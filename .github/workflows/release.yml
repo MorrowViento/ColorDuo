@@ -90,9 +90,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          flags=()
+          flags=(--prerelease=false)
           if [[ "$VERSION_NAME" == *-* ]]; then
-            flags+=(--prerelease)
+            flags=(--prerelease=true)
           fi
           gh release create "v$VERSION_NAME" dist/*.apk dist/SHA256SUMS \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \

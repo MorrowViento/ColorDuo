@@ -136,6 +136,12 @@ def gh(*args):
     subprocess.run(["gh", *args], check=True)
 
 
+def channel_flags(source):
+    prerelease = bool(source["prerelease"])
+    latest = bool(source.get("is_latest")) and not prerelease
+    return [f"--prerelease={str(prerelease).lower()}", f"--latest={str(latest).lower()}"]
+
+
 def publish_release(args, source, digest, repo):
     tag = f"{args.version_code}-{args.version}"
     existing = optional("repos/" + MODULE + "/releases/tags/" + tag)
@@ -144,6 +150,7 @@ def publish_release(args, source, digest, repo):
             gh("release", "download", tag, "--repo", MODULE, "--pattern", args.apk.name, "--dir", directory)
             if hashlib.sha256((Path(directory) / args.apk.name).read_bytes()).hexdigest() != digest:
                 raise ValueError("Published module APK differs; create a new version instead of replacing it")
+        gh("release", "edit", tag, "--repo", MODULE, *channel_flags(source))
         return existing["html_url"]
     if existing is None:
         drafts = api("repos/" + MODULE + "/releases?per_page=100")
@@ -155,12 +162,11 @@ def publish_release(args, source, digest, repo):
     if existing is None:
         command = ["release", "create", tag, "--repo", MODULE, "--target", repo["default_branch"],
                    "--title", args.version, "--notes-file", str(notes), "--draft"]
-        if source["prerelease"]:
-            command.append("--prerelease")
+        command.append(f"--prerelease={str(bool(source['prerelease'])).lower()}")
         gh(*command)
     gh("release", "upload", tag, str(args.apk), str(args.apk.parent / "SHA256SUMS"),
        "--repo", MODULE, "--clobber")
-    gh("release", "edit", tag, "--repo", MODULE, "--draft=false")
+    gh("release", "edit", tag, "--repo", MODULE, "--draft=false", *channel_flags(source))
     return "https://github.com/" + MODULE + "/releases/tag/" + tag
 
 
@@ -178,6 +184,8 @@ def main():
     source = api(f"repos/{SOURCE}/releases/tags/v{args.version}")
     if source["draft"] or not source.get("body", "").strip():
         raise ValueError("Publish the source release with changelog first")
+    latest = optional(f"repos/{SOURCE}/releases/latest")
+    source["is_latest"] = latest is not None and latest["id"] == source["id"]
     metadata = {"applicationId": PACKAGE, "versionName": args.version, "versionCode": int(args.version_code)}
     verify_apk(args.apk, "release", metadata, Path(os.environ["ANDROID_HOME"]))
     digest = hashlib.sha256(args.apk.read_bytes()).hexdigest()

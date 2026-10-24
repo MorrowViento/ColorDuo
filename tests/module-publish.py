@@ -93,23 +93,39 @@ class ModulePublicationTest(unittest.TestCase):
         api.assert_not_called()
 
     def test_published_apk_cannot_be_replaced(self):
-        args = type("Args", (), {"version_code": "10006", "version": "0.1.0-alpha6",
-                                 "apk": Path("ColorDuo-0.1.0-alpha6.apk")})()
+        args = type("Args", (), {"version_code": "10007", "version": "0.1.0",
+                                 "apk": Path("ColorDuo-0.1.0.apk")})()
         calls = []
 
         def gh(*command):
             calls.append(command)
-            self.assertEqual(command[:2], ("release", "download"))
-            directory = Path(command[command.index("--dir") + 1])
-            (directory / args.apk.name).write_bytes(b"already published APK")
+            self.assertIn(command[:2], (("release", "download"), ("release", "edit")))
+            if command[:2] == ("release", "download"):
+                directory = Path(command[command.index("--dir") + 1])
+                (directory / args.apk.name).write_bytes(b"already published APK")
 
         existing = {"draft": False, "html_url": "https://github.com/module/release"}
+        source = {"prerelease": False, "is_latest": True}
         with mock.patch.dict(state, {"optional": mock.Mock(return_value=existing), "gh": gh}):
             with self.assertRaisesRegex(ValueError, "instead of replacing"):
-                module["publish_release"](args, {}, "different-sha", {})
+                module["publish_release"](args, source, "different-sha", {})
+            self.assertEqual(len(calls), 1)
             digest = hashlib.sha256(b"already published APK").hexdigest()
-            self.assertEqual(module["publish_release"](args, {}, digest, {}), existing["html_url"])
-        self.assertEqual(len(calls), 2)
+            self.assertEqual(module["publish_release"](args, source, digest, {}), existing["html_url"])
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(calls[-1][-2:], ("--prerelease=false", "--latest=true"))
+
+    def test_stable_release_flags_are_explicit(self):
+        flags = module["channel_flags"]({"prerelease": False, "is_latest": True})
+        self.assertEqual(flags, ["--prerelease=false", "--latest=true"])
+
+    def test_historical_release_does_not_replace_latest(self):
+        flags = module["channel_flags"]({"prerelease": False, "is_latest": False})
+        self.assertEqual(flags, ["--prerelease=false", "--latest=false"])
+
+    def test_prerelease_cannot_be_latest(self):
+        flags = module["channel_flags"]({"prerelease": True, "is_latest": True})
+        self.assertEqual(flags, ["--prerelease=true", "--latest=false"])
 
 
 if __name__ == "__main__":

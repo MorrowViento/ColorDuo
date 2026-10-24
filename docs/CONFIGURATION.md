@@ -55,6 +55,8 @@
 
 同签名覆盖安装会保留 ColorDuo 配置，更新 APK 后需要重启 SystemUI。日常配置修改实时生效。
 
+从 alpha6 更新至 `0.1.0` 正式版可直接覆盖安装，配置保留。
+
 alpha6 起应用 ID 改为 `io.github.chorusfruit_233.colorduo` 并使用发布签名。旧 alpha 的 `io.github.chorusfruit233.colorduo` 是另一个应用，配置不会自动迁移。安装 alpha6 前，先在 LSPosed 停用旧包的 ColorDuo，再启用新包并勾选系统界面，避免两个模块同时接管。
 
 alpha5 将同一组绘图配置应用到主状态栏、下拉通知栏、控制面板头部和锁屏的同类电池视图。alpha4 及以前只接管主状态栏，其他区域显示原生属于当时的移植缺口，与上游的跨页面处理尚未对齐。alpha5 的实际展开动画和跨页面配色仍需真机复测。

@@ -1,8 +1,14 @@
 # ColorDuo 更新记录
 
-本页记录 `chorusfruit-233/ColorDuo` 自身的测试版本，专注 ColorOS 17。HyperDuo 1.x 发布说明保留在 [release-notes/](release-notes/) 作为上游历史资料。
+本页记录 `chorusfruit-233/ColorDuo` 自身的版本，专注 ColorOS 17。HyperDuo 1.x 发布说明保留在 [release-notes/](release-notes/) 作为上游历史资料。
 
 以下版本均于 2026-10-24 构建。离线检查与构建结果、参考固件数据和真机反馈分别记录，具体边界见 [适配与验证记录](COLOROS17.md)。
+
+## 0.1.0
+
+- 发布 `0.1.0` 正式版，versionCode 递增至 `10007`，源码仓库与模块仓库同步正式版标记。
+- 沿用 alpha6 的应用 ID、发布签名及功能，可覆盖安装并保留配置；更新后重启 SystemUI 或手机。
+- 发布流程显式同步正式版和 Latest 标记，重复执行时也会校正已有 Release 的状态。
 
 ## 0.1.0-alpha6
 

@@ -34,7 +34,7 @@ Prepare release 只创建源码仓库的 Release 草稿，并附 APK 和校验�
 
 模块仓位于外部组织，当前 GitHub 集成创建申请 Issue 会返回 403 `Resource not accessible by integration`。自动上架另需 `MODULE_REPO_TOKEN` Actions secret，使用账户 `chorusfruit-233` 的 GitHub classic PAT，授予 `public_repo` 和 `repo:invite`，供模块仓工作流使用；令牌值不写入源码或日志。
 
-先公开源码仓库的签名 Release，再手动运行 Publish to module repository，填写同一版本和 versionCode。流程重新检查 APK、签名与校验文件，只接受目标模块仓的邀请，上传 `README.md`、`SUMMARY`、`SOURCE_URL` 及同一 APK。已公开版本的 APK 若不一致则拒绝覆盖。仓库资料优先通过 API 配置；若维护权限仍要求浏览器设置，先完成文件与 Release 发布，再明确报告需要手动填写的字段。
+先公开源码仓库的签名 Release，再手动运行 Publish to module repository，填写同一版本和 versionCode。流程重新检查 APK、签名与校验文件，只接受目标模块仓的邀请，上传 `README.md`、`SUMMARY`、`SOURCE_URL` 及同一 APK。正式版标记随源码仓同步，只有源码仓当前 Latest 版本会同步为模块仓 Latest。已公开版本的 APK 若不一致则拒绝覆盖，文件一致时允许校正 Release 状态。仓库资料优先通过 API 配置；若维护权限仍要求浏览器设置，先完成文件与 Release 发布，再明确报告需要手动填写的字段。
 
 ## 模块仓条件核对
 
@@ -58,6 +58,6 @@ Prepare release 只创建源码仓库的 Release 草稿，并附 APK 和校验�
 2. 在 [submission](https://github.com/Xposed-Modules-Repo/submission) 新建 Issue，标题为 `[submission] <最终 applicationId>`，然后接受机器人发出的模块仓维护邀请。
 3. 在浏览器为模块仓设置 Description 为 `ColorDuo`，Homepage 指向源码仓库或 Issues。官方提示维护权限不足以通过 API 修改这些设置。
 4. 只上传模块说明与摘要，不把源码推入模块仓。将 `module-README.md` 作为 `README.md`、`module-SUMMARY` 作为 `SUMMARY`。
-5. 将同一签名 APK 发布到模块仓：Release 标题为版本名、正文为该版更新记录、tag 为 `<versionCode>-<versionName>`，例如 `10006-0.1.0-alpha6`。首次发布时同时附上有效 APK。
+5. 将同一签名 APK 发布到模块仓：Release 标题为版本名、正文为该版更新记录、tag 为 `<versionCode>-<versionName>`，例如 `10007-0.1.0`。首次发布时同时附上有效 APK。
 
 官方说明完整资料及 Release 更新后通常需要 5～60 分钟显示。最终是否收录以模块仓机器人及维护者处理结果为准。
