@@ -52,6 +52,10 @@ final class ColorOsHooks {
     private static final Map<View, WeakReference<Host>> CHILDREN = new WeakHashMap<>();
     private static final Map<Integer, Mobile> MOBILES = new ConcurrentHashMap<>();
     private static volatile Object wifiFlow;
+    private static volatile WifiSample renderedWifi = WifiSample.UNKNOWN;
+    private static Class<?> wifiActiveClass;
+    private static Class<?> wifiCarrierMergedClass;
+    private static final Set<Class<?>> disconnectedWifiClasses = new HashSet<>();
     private static volatile Object batteryLevelFlow;
     private static volatile Object chargeFlow;
     private static volatile Object savingFlow;
@@ -69,6 +73,12 @@ final class ColorOsHooks {
     static void install(XposedModule module, ClassLoader loader) {
         meterClass = Refl.cls(METER_CLASS, loader);
         phoneBarClass = Refl.cls("com.android.systemui.statusbar.phone.PhoneStatusBarView", loader);
+        wifiActiveClass = Refl.cls(WIFI + "shared.model.WifiNetworkModel$Active", loader);
+        wifiCarrierMergedClass = Refl.cls(WIFI + "shared.model.WifiNetworkModel$CarrierMerged", loader);
+        for (String name : new String[] {"Inactive", "Unavailable", "Invalid"}) {
+            Class<?> type = Refl.cls(WIFI + "shared.model.WifiNetworkModel$" + name, loader);
+            if (type != null) disconnectedWifiClasses.add(type);
+        }
         if (meterClass == null || phoneBarClass == null) {
             throw new IllegalStateException("ColorOS battery/status bar classes unavailable");
         }
@@ -151,6 +161,23 @@ final class ColorOsHooks {
                 "getWifiNetwork", true);
         count += captureFlow(module, loader, WIFI + "data.repository.prod.WifiRepositoryImpl",
                 "getWifiNetwork", true);
+        // Observe the model actually converted into the native icon. Merely reading an unused
+        // WhileSubscribed repository can keep returning its initial Inactive snapshot forever.
+        Class<?> wifiIcons = Refl.cls(WIFI + "ui.model.WifiIcon$Companion", loader);
+        if (wifiIcons != null) for (Method method : wifiIcons.getDeclaredMethods()) {
+            if (!method.getName().equals("fromModel") || method.getParameterCount() != 3) continue;
+            count += hook(module, method, chain -> {
+                Object result = chain.proceed();
+                WifiSample sample = wifiSample(chain.getArg(0));
+                WifiSample previous = renderedWifi;
+                renderedWifi = sample;
+                if (!java.util.Objects.equals(previous.connected, sample.connected)
+                        || previous.level != sample.level || previous.carrierMerged != sample.carrierMerged) {
+                    invalidateHosts();
+                }
+                return result;
+            });
+        }
         count += captureFlow(module, loader, MOBILE + "OplusCellularIconViewModelImpl",
                 "getIcon", false);
         count += captureFlow(module, loader, MOBILE + "OplusCellularIconViewModelImpl",
@@ -305,6 +332,35 @@ final class ColorOsHooks {
         return value instanceof Boolean ? (Boolean) value : fallback;
     }
 
+    private static WifiSample wifiSample(Object model) {
+        if (model == null) return WifiSample.UNKNOWN;
+        int level = ColorOsPolicy.wifiModelLevel(wifiActiveClass, model);
+        if (level >= 0) {
+            return new WifiSample(Boolean.TRUE, level, false, "Active");
+        }
+        if (wifiCarrierMergedClass != null && wifiCarrierMergedClass.isInstance(model)) {
+            return new WifiSample(Boolean.FALSE, -1, true, "CarrierMerged");
+        }
+        if (disconnectedWifiClasses.contains(model.getClass())) {
+            return new WifiSample(Boolean.FALSE, -1, false, "Disconnected");
+        }
+        return WifiSample.UNKNOWN;
+    }
+
+    private static final class WifiSample {
+        static final WifiSample UNKNOWN = new WifiSample(null, -1, false, "Unknown");
+        final Boolean connected;
+        final int level;
+        final boolean carrierMerged;
+        final String kind;
+        WifiSample(Boolean connected, int level, boolean carrierMerged, String kind) {
+            this.connected = connected;
+            this.level = level;
+            this.carrierMerged = carrierMerged;
+            this.kind = kind;
+        }
+    }
+
     private static final class Mobile {
         volatile Object icon;
         volatile Object type;
@@ -331,6 +387,8 @@ final class ColorOsHooks {
         int ownedWidth;
         int ownedHeight;
         long nextSignalSample;
+        String lastWifiNote;
+        String lastWifiHandoff;
         View extra;
 
         Host(ViewGroup meter) {
@@ -423,6 +481,7 @@ final class ColorOsHooks {
             if (!logged) {
                 logged = true;
                 TrioHooks.log(TrioHooks.LOG_INFO, "ColorOS host active: level=" + state.level + " wifiFlow=" + (wifiFlow != null)
+                        + " wifiLevel=" + state.wifiLevel + " wifiPresent=" + state.wifiPresent
                         + " mobileSubscriptions=" + MOBILES.size());
             }
         }
@@ -501,16 +560,33 @@ final class ColorOsHooks {
                     Refl.field(viewModel == null ? null : viewModel.getClass(), "isSavingMode"), viewModel), false));
             state.low = state.level >= 0 && state.level <= 15;
 
+            // Wi-Fi reads cached observations only. Process every connection notification even
+            // inside the telephony sampling interval so disconnect/reconnect is not delayed.
+            WifiSample nativeSample = renderedWifi;
+            WifiSample repository = wifiSample(value(wifiFlow));
+            Boolean connected = WifiPresence.connectedSnapshot();
+            boolean carrierMerged = nativeSample.connected == null
+                    ? repository.carrierMerged : nativeSample.carrierMerged;
+            state.wifiLevel = ColorOsPolicy.wifiLevel(connected, TrioState.sWifiLevel,
+                    nativeSample.connected, nativeSample.level, repository.level, carrierMerged);
+            state.wifiPresent = !carrierMerged && (state.wifiLevel >= 0
+                    || Boolean.TRUE.equals(connected) || Boolean.TRUE.equals(nativeSample.connected));
+            if (TrioConfig.debugLog()) {
+                String note = "ColorOS wifi: connected=" + connected
+                        + " rendered=" + nativeSample.kind + "/" + nativeSample.level
+                        + " repository=" + repository.kind + "/" + repository.level
+                        + " platformLevel=" + TrioState.sWifiLevel + " resolved=" + state.wifiLevel;
+                if (!note.equals(lastWifiNote)) {
+                    lastWifiNote = note;
+                    TrioHooks.log(TrioHooks.LOG_INFO, note);
+                }
+            }
+
             // Dark-mode animation dispatches many binder updates per second. Only cached battery
             // and color values are read on those updates; telephony IPC is bounded independently.
             long now = SystemClock.elapsedRealtime();
             if (now < nextSignalSample) return;
             nextSignalSample = now + 1000L;
-            Object network = value(wifiFlow);
-            state.wifiLevel = integer(Refl.callByName(network, "getLevel"), TrioState.sWifiLevel);
-            state.wifiPresent = network == null ? TrioState.sWifiPresent
-                    : network.getClass().getSimpleName().equals("Active");
-            if (!state.wifiPresent) state.wifiLevel = -1;
             TrioState.pollSimsNow();
             state.slotLevels = TrioState.sSlotLevels.clone();
             state.mobileLevel = -1;
@@ -585,6 +661,15 @@ final class ColorOsHooks {
                         && appearance.foldsMobile() && state.sims > 0) wanted.add((String) slot);
             }
             updateSlots(wanted);
+            if (TrioConfig.debugLog()) {
+                String note = "ColorOS wifi handoff: owns=" + appearance.ownsWifi()
+                        + " level=" + state.wifiLevel + " container=" + (iconContainer != null)
+                        + " requested=" + wanted;
+                if (!note.equals(lastWifiHandoff)) {
+                    lastWifiHandoff = note;
+                    TrioHooks.log(TrioHooks.LOG_INFO, note);
+                }
+            }
         }
 
         void syncExtra(TrioAppearance appearance) {

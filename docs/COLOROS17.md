@@ -19,7 +19,7 @@
 | 原生视图更新 | `BatteryViewBinder.bind*`；外层调用前恢复原生状态，调用结束后保存最新原生状态并重装模块 drawable；按实例过滤的框架 setter 同时跟踪被内联的系统更新 |
 | 电池状态 | `BatteryRepositoryImpl.getBatteryLevel/getChargeState/isSavingMode` 的 StateFlow |
 | 每个 View 的颜色 | `LocationBasedBatteryViewModel.getBatteryColor` 与 `StatBatteryIcon.getTintColor` |
-| Wi-Fi | `WifiRepositorySwitcher/WifiRepositoryImpl.getWifiNetwork` |
+| Wi-Fi | `WifiIcon.Companion.fromModel` 的实时模型，仓库 StateFlow 和框架连接状态兜底 |
 | 分卡信号 | `OplusCellularIconViewModelImpl.getIcon/getNetworkTypeText/getSubscriptionId` |
 | 原生图标 | `StatusIconContainer.mIgnoredSlots`；仅撤销模块自己添加的 slot |
 
@@ -46,3 +46,15 @@
 首版验收以主状态栏圆环为准。上游胶囊绘图和设置保留，但 ColorOS 的原生时钟接管、特殊通知/充电动画交接、环外读数的全部间距选项尚未完成真机验证。锁屏和快捷设置区域暂不接管。
 
 测试签名沿用原仓库开发密钥；测试 APK 通过 Actions artifact 分发，工作流不自动发布 Release，不修改用户已有的 SystemUI 草稿附件。
+
+## alpha2：Wi-Fi 状态识别修复
+
+用户日志确认 alpha1 已正常注入并激活电池视图，但 Wi-Fi 未绘制且原生图标仍显示；系统 Wi-Fi 日志同时记录了有效的两格、三格信号。
+
+参考 APK 的 `WifiNetworkModel$Active` DEX 类没有 class annotations。alpha1 使用 `getSimpleName().equals("Active")`，在缺少内部类元数据时会误判这个已连接对象。alpha2 改用通过目标 ClassLoader 找到的实际类型，并对字段/方法取值做范围检查。
+
+同时观察原生图标转换时使用的 Wi-Fi 模型，保留连接状态兜底，避免未订阅仓库的初始快照覆盖有效连接。框架采样采用 NetworkCapabilities 与关联状态，兼容 legacy TYPE_WIFI NetworkInfo 缺失及 VPN 默认路由。Wi-Fi 的缓存刷新独立于电话服务采样限频。
+
+新增回归测试复现没有 InnerClass 元数据的二进制类名，并覆盖冷仓库、断开/重连、未知连接、弱信号、无效等级和 carrier-merged 状态。调试日志只记录连接状态、等级和 slot 接管结果，不记录 SSID/BSSID。
+
+复测：直接覆盖安装 alpha2 后重启 SystemUI，检查连接时环内 Wi-Fi 与原生图标交接、关闭/重连，以及关闭模块后恢复原生 Wi-Fi。

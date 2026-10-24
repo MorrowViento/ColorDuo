@@ -2,7 +2,7 @@
 
 将状态栏的电池、Wi-Fi 和移动信号合并为一个三合一图标，基于 [HyperDuo](https://github.com/yixing233/HyperDuo) 移植。
 
-当前版本：`0.1.0-alpha1`。适配对象是一加 13（PJZ110）、ColorOS 17、Android 17，参考 SystemUI `17.99.02`。此版本已完成静态适配与构建验证，真机验证结果会记录在 [ColorOS 适配说明](docs/COLOROS17.md)。
+当前版本：`0.1.0-alpha2`。适配对象是一加 13（PJZ110）、ColorOS 17、Android 17，参考 SystemUI `17.99.02`。此版本已完成静态适配与构建验证，真机验证结果会记录在 [ColorOS 适配说明](docs/COLOROS17.md)。
 
 ## 当前实现
 

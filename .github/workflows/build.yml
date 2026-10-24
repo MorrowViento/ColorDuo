@@ -45,9 +45,9 @@ jobs:
       - name: Collect
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk dist/ColorDuo-0.1.0-alpha1.apk
+          cp app/build/outputs/apk/debug/app-debug.apk dist/ColorDuo-0.1.0-alpha2.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: ColorDuo-0.1.0-alpha1
+          name: ColorDuo-0.1.0-alpha2
           path: dist/*.apk
           if-no-files-found: error
