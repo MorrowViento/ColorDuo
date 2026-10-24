@@ -63,6 +63,7 @@ sh tests/coloros-settings.sh
 python3 tests/coloros-power.py
 python3 tests/coloros-hosts.py
 python3 tests/release-artifacts.py
+python3 tests/module-publish.py
 ./gradlew --no-daemon :app:assembleDebug
 ```
 

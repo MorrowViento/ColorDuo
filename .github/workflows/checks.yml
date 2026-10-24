@@ -32,3 +32,5 @@ jobs:
         run: python3 tests/coloros-hosts.py
       - name: Publication metadata
         run: python3 tests/release-artifacts.py
+      - name: Module repository publication
+        run: python3 tests/module-publish.py

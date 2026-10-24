@@ -26,6 +26,8 @@
 /dist/
 /.gradle/
 /.kotlin/
+__pycache__/
+*.pyc
 *.apk
 *.apks
 *.idsig

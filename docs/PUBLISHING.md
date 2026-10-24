@@ -7,6 +7,7 @@
 | [Build ColorDuo](../.github/workflows/build.yml) | main 的代码推送、PR 和手动触发；检查通过后构建测试包 |
 | [Checks](../.github/workflows/checks.yml) | 两种构建共用的五组行为回归及发布元数据检查，不安装 Android SDK |
 | [Prepare release](../.github/workflows/release.yml) | 手动构建私有签名的 release APK，上传发布素材并创建本仓库 Release 草稿 |
+| [Publish to module repository](../.github/workflows/module.yml) | 复用公开签名 APK，申请模块仓、接受邀请、同步介绍并发布同一文件 |
 
 文档修改跳过测试包构建；同一分支的新构建取消旧构建。Android 环境统一使用 JDK 21、SDK 37 和仓库内的 Gradle Wrapper，Gradle 缓存由公共安装步骤管理。
 
@@ -27,7 +28,13 @@
 
 开发测试包继续使用原签名以支持覆盖升级。没有私有签名环境时，本地 release 构建产出未签名 APK。换成新签名后，旧开发签名测试包不能直接覆盖安装。
 
-流程只创建源码仓库的 Release 草稿，并附 APK 和校验文件。带后缀的版本自动标记为预发布；应用内检查更新只查询稳定 Release，预发布包通过 Actions 或 Release 页面下载。模块仓素材位于 Actions 发布 bundle 的 `README.md`、`SUMMARY`、`CHANGELOG.md`；当前没有向外部模块仓自动提交申请或上传发布的步骤。
+Prepare release 只创建源码仓库的 Release 草稿，并附 APK 和校验文件。带后缀的版本自动标记为预发布；应用内检查更新只查询稳定 Release，预发布包通过 Actions 或 Release 页面下载。模块仓素材位于 Actions 发布 bundle 的 `README.md`、`SUMMARY`、`CHANGELOG.md`，外部模块仓的申请和发布由独立工作流执行。
+
+## 模块仓写入凭据
+
+模块仓位于外部组织，当前 GitHub 集成创建申请 Issue 会返回 403 `Resource not accessible by integration`。自动上架另需 `MODULE_REPO_TOKEN` Actions secret，使用账户 `chorusfruit-233` 的 GitHub classic PAT，授予 `public_repo` 和 `repo:invite`，供模块仓工作流使用；令牌值不写入源码或日志。
+
+先公开源码仓库的签名 Release，再手动运行 Publish to module repository，填写同一版本和 versionCode。流程重新检查 APK、签名与校验文件，只接受目标模块仓的邀请，上传 `README.md`、`SUMMARY`、`SOURCE_URL` 及同一 APK。已公开版本的 APK 若不一致则拒绝覆盖。仓库资料优先通过 API 配置；若维护权限仍要求浏览器设置，先完成文件与 Release 发布，再明确报告需要手动填写的字段。
 
 ## 模块仓条件核对
 
@@ -38,9 +45,9 @@
 | 申请者与包名 | **匹配**：`chorusfruit-233` 经机器人规范化后是 `chorusfruit_233`；alpha6 起应用 ID 为 `io.github.chorusfruit_233.colorduo` |
 | Xposed APK 结构 | 具有 `META-INF/xposed/module.prop`、`java_init.list`、`scope.list`，API 102；模块仓支持这种现代格式 |
 | 模块介绍与摘要 | 已有 `module-README.md` 和 `module-SUMMARY`，复制到模块仓后对应 `README.md`、`SUMMARY`；介绍中的链接使用源码仓库绝对地址 |
-| 可公开下载的版本 | 正在准备 `0.1.0-alpha6` / `10006` 的签名 APK；现有 SystemUI 草稿是适配参考文件 |
-| 发布签名 | 用户已配置上述四项 secrets，通过发布构建验证后使用。私有签名是本项目发布流程的要求，submission 机器人并未规定这一条件 |
-| 模块仓申请与设置 | 待签名 APK 验证后提交申请、接受邀请并配置模块仓资料 |
+| 可公开下载的版本 | 已公开 [0.1.0-alpha6](https://github.com/chorusfruit-233/ColorDuo/releases/tag/v0.1.0-alpha6) / `10006` 的签名 APK；现有 SystemUI 草稿是适配参考文件 |
+| 发布签名 | 四项 secrets 已由 [发布构建](https://github.com/chorusfruit-233/ColorDuo/actions/runs/40091369875) 验证，实际 APK 签名检查通过。私有签名是本项目发布流程的要求，submission 机器人并未规定这一条件 |
+| 模块仓申请与设置 | 用户已配置 `MODULE_REPO_TOKEN`，由模块仓流程执行申请、邀请接受和发布 |
 
 **包名已满足账户前缀的自动审核规则，正在完成首次上架。** alpha6 使用新应用 ID 和发布签名，旧 alpha 配置不会自动迁移；具体升级步骤见 [配置说明](CONFIGURATION.md#升级与生效)。
 

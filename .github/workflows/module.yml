@@ -1,0 +1,59 @@
+name: Publish to module repository
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published source release version
+        required: true
+        type: string
+      version_code:
+        description: Android versionCode of that release
+        required: true
+        type: number
+
+permissions:
+  contents: read
+
+concurrency:
+  group: module-publication
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      VERSION_NAME: ${{ inputs.version }}
+      VERSION_CODE: ${{ inputs.version_code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate release inputs
+        run: >-
+          python3 scripts/ci/artifacts.py plan
+          --version "$VERSION_NAME" --version-code "$VERSION_CODE"
+      - name: Check module publishing credential
+        env:
+          GH_TOKEN: ${{ secrets.MODULE_REPO_TOKEN }}
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo 'Configure MODULE_REPO_TOKEN with public_repo and repo:invite permissions.' >&2
+            exit 1
+          fi
+          test "$(gh api user --jq .login)" = 'chorusfruit-233'
+      - uses: ./.github/actions/android
+      - name: Download the published source APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "v$VERSION_NAME" --repo "$GITHUB_REPOSITORY" \
+            --pattern "ColorDuo-$VERSION_NAME.apk" --pattern SHA256SUMS --dir dist
+      - name: Apply, accept invitation and publish
+        env:
+          GH_TOKEN: ${{ secrets.MODULE_REPO_TOKEN }}
+        run: >-
+          python3 scripts/ci/publish-module.py
+          --version "$VERSION_NAME" --version-code "$VERSION_CODE"
+          --apk "dist/ColorDuo-$VERSION_NAME.apk"
