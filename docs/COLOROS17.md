@@ -110,7 +110,7 @@ ColorOS 的网络类型值是 `OplusNetworkTypeTextModel`，含有具体文字�
 
 ## 0.1.1：双电芯功率适配
 
-`0.1.0` 以前只校正电流单位，随后直接使用 `ACTION_BATTERY_CHANGED` 电压；未区分单节与整包电压。上面的 `2.21464 W` 是单位修复后按 4465 mV 计算的结果，不能据此证明已统计整包功率。
+`0.1.0` 及更早版本只校正电流单位，随后直接使用 `ACTION_BATTERY_CHANGED` 电压；未区分单节与整包电压。上面的 `2.21464 W` 是单位修复后按 4465 mV 计算的结果，不能据此证明已统计整包功率。
 
 OnePlus 官方 [SM8750 充电驱动](https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8750/blob/d50b305f7da9e14715a25120a4ac7b1a4b8b97c3/vendor/oplus/kernel/charger/v2/oplus_chg_gki.c) 的 battery `VOLTAGE_NOW` 使用 `GAUGE_ITEM_VOL_MAX`，`CURRENT_NOW` 直接返回 gauge 电流。[gauge 实现](https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8750/blob/d50b305f7da9e14715a25120a4ac7b1a4b8b97c3/vendor/oplus/kernel/charger/v2/mms/oplus_mms_gauge.c) 明确将 `batt_num == 2` 用于 2S 检查。[configfs 实现](https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8750/blob/d50b305f7da9e14715a25120a4ac7b1a4b8b97c3/vendor/oplus/kernel/charger/v2/oplus_configfs.c) 的 `aging_ffc_data` 第二字段即该串联数量。该源码属于厂商公开参考，目标 Android 17 固件仍需与实际接口读数对照。
 
