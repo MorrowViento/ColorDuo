@@ -26,6 +26,37 @@ final class ColorOsPolicy {
         }
     }
 
+    /** Oplus aging_ffc_data: version, series-cell count, reserved, debug cycles, cycles. */
+    static int batterySeriesCells(String agingFfcData) {
+        if (agingFfcData == null) return 0;
+        String[] fields = agingFfcData.trim().split(",", -1);
+        if (fields.length < 5 || (fields.length - 5) % 2 != 0) return 0;
+        try {
+            for (String field : fields) {
+                Integer.parseInt(field.trim());
+            }
+            if (Integer.parseInt(fields[0].trim()) < 0 || Integer.parseInt(fields[4].trim()) < 0) return 0;
+            if (Integer.parseInt(fields[2].trim()) != 0) return 0;
+            int cells = Integer.parseInt(fields[1].trim());
+            return cells == 1 || cells == 2 ? cells : 0;
+        } catch (NumberFormatException malformed) {
+            return 0;
+        }
+    }
+
+    /** Both the measured firmware and its OnePlus 13 gauge use a two-cell series pack. */
+    static int batterySeriesCells(String fingerprint, int detected) {
+        if (detected == 1 || detected == 2) return detected;
+        return MILLIAMP_FIRMWARE.equals(fingerprint) ? 2 : 0;
+    }
+
+    /** Do not multiply a pack voltage, a parallel pack or an unknown topology. */
+    static int batteryPackVoltageMilliVolts(int reported, int seriesCells, int measuredPack) {
+        if (seriesCells != 2 || reported <= 0 || reported > 5000) return reported;
+        if (measuredPack > 5000 && measuredPack <= 10000) return measuredPack;
+        return reported * 2;
+    }
+
     static int mobileLevel(int level, int numberOfLevels, boolean inService) {
         if (!inService) return 0;
         if (level < 0 || numberOfLevels < 2) return -1;

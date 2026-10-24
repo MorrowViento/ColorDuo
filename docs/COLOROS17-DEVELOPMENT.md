@@ -40,6 +40,7 @@ Windows 可使用 `gradlew.bat --no-daemon :app:assembleDebug`。首次构建需
 | `HyperDuoModule.java` | 框架入口，选择系统适配器 |
 | `ColorOsHooks.java` | ColorOS 视图接管、原生更新跟踪、状态流捕获与恢复 |
 | `ColorOsPolicy.java` | 模型解析、信号换算、参考固件电流单位及 slot 所有权规则 |
+| `ColorOsBattery.java` | 只读检测 Oplus 串联电芯数量、选择整包电压并归一化功率输入 |
 | `ColorOsLayout.java` | 主状态栏、锁屏与通知/QS 头部的本地容器关联，隔离各行图标 |
 | `ColorOsReadings.java` | 在 ColorOS 原生布局中挂载环外读数组，复用共享绘制与排版函数 |
 | `BatteryPresence.java` / `WifiPresence.java` | 框架状态采样；电流在采样入口进行 ROM 单位适配 |
@@ -83,7 +84,7 @@ adb logcat -v time -s LSPosedFramework | rg 'ColorDuo|io\.github\.chorusfruit233
 
 设备信息应包含机型、完整固件指纹、SystemUI、Android、LSPosed 和模块版本。记录组件顺序、连接与充电状态，再与实际状态栏对照；预览使用固定示例数据。
 
-电池日志包含原始电流、单位、归一化电流与电压。网络日志包含模型捕获情况、数据卡槽、信号等级和制式文字。反馈入口是 [ColorDuo Issues](https://github.com/chorusfruit-233/ColorDuo/issues)。
+电池日志包含原始电流、单位、归一化电流、广播电压、串联电芯数量及来源、功率计算使用的电压及来源。网络日志包含模型捕获情况、数据卡槽、信号等级和制式文字。反馈入口是 [ColorDuo Issues](https://github.com/chorusfruit-233/ColorDuo/issues)。
 
 ## 构建产物与分发
 

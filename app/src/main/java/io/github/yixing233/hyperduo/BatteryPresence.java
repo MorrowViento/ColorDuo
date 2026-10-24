@@ -131,9 +131,14 @@ final class BatteryPresence {
                     ? TrioState.TEMP_UNKNOWN
                     : Math.round(temperature / 10f);
             int current = currentNow(context);
-            // Normalize ROM input units before the shared upstream calculation.
-            if (ColorOsHooks.isInstalled()) current = ColorOsHooks.batteryCurrentMicroAmps(current, voltage);
-            final float watts = wattsOf(current, voltage);
+            int powerVoltage = voltage;
+            // Normalize ROM input units and pack voltage before the shared calculation.
+            if (ColorOsHooks.isInstalled()) {
+                ColorOsBattery.Sample sample = ColorOsHooks.batterySample(current, voltage);
+                current = sample.currentMicroAmps;
+                powerVoltage = sample.voltageMilliVolts;
+            }
+            final float watts = wattsOf(current, powerVoltage);
             publish(attached, watts, whole);
         } catch (RuntimeException ignored) {
             // Permissions/ROM differences must not crash SystemUI.

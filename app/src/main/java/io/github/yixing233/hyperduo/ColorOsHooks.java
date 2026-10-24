@@ -89,17 +89,22 @@ final class ColorOsHooks {
 
     static boolean isInstalled() { return installed; }
 
-    /** Normalize the ROM's input units before the unchanged upstream power calculation. */
-    static int batteryCurrentMicroAmps(int reported, int voltageMilliVolts) {
-        int current = ColorOsPolicy.batteryCurrentMicroAmps(Build.FINGERPRINT, reported);
+    private static final ColorOsBattery BATTERY_SAMPLER = new ColorOsBattery();
+
+    /** Normalize current units and per-cell voltage before the shared upstream calculation. */
+    static ColorOsBattery.Sample batterySample(int reported, int voltageMilliVolts) {
+        ColorOsBattery.Sample sample = BATTERY_SAMPLER.sample(Build.FINGERPRINT, reported, voltageMilliVolts,
+                android.os.SystemClock.elapsedRealtime());
         String note = "ColorOS battery: rawCurrent=" + reported
                 + " rawUnit=" + (ColorOsPolicy.batteryReportsMilliamps(Build.FINGERPRINT) ? "mA" : "uA")
-                + " currentMicroAmps=" + current + " voltageMilliVolts=" + voltageMilliVolts;
+                + " currentMicroAmps=" + sample.currentMicroAmps + " voltageMilliVolts=" + voltageMilliVolts
+                + " seriesCells=" + sample.seriesCells + " cellsSource=" + sample.cellsSource
+                + " powerVoltageMilliVolts=" + sample.voltageMilliVolts + " voltageSource=" + sample.voltageSource;
         if (lastBatterySample == null || (TrioConfig.debugLog() && !note.equals(lastBatterySample))) {
             TrioHooks.log(TrioHooks.LOG_INFO, note);
         }
         lastBatterySample = note;
-        return current;
+        return sample;
     }
 
     static void install(XposedModule module, ClassLoader loader) {

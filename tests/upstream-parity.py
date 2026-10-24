@@ -51,9 +51,16 @@ def normalize(name, data):
     if name == "BatteryPresence.java":
         data = data.replace(
             b"            int current = currentNow(context);\n"
-            b"            // Normalize ROM input units before the shared upstream calculation.\n"
-            b"            if (ColorOsHooks.isInstalled()) current = ColorOsHooks.batteryCurrentMicroAmps(current, voltage);\n",
-            b"            final int current = currentNow(context);\n")
+            b"            int powerVoltage = voltage;\n"
+            b"            // Normalize ROM input units and pack voltage before the shared calculation.\n"
+            b"            if (ColorOsHooks.isInstalled()) {\n"
+            b"                ColorOsBattery.Sample sample = ColorOsHooks.batterySample(current, voltage);\n"
+            b"                current = sample.currentMicroAmps;\n"
+            b"                powerVoltage = sample.voltageMilliVolts;\n"
+            b"            }\n"
+            b"            final float watts = wattsOf(current, powerVoltage);\n",
+            b"            final int current = currentNow(context);\n"
+            b"            final float watts = wattsOf(current, voltage);\n")
     return data
 
 
