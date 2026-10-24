@@ -117,6 +117,25 @@ public final class ColorOsPowerTest {
                 "the dual-cell sample represents total battery-side power");
         check(powerText(wattsOf(dual.currentMicroAmps, dual.voltageMilliVolts)).equals("4.4W"),
                 "dual-cell input retains the original power formatter");
+
+        Nodes actual = new Nodes();
+        actual.cells = "0,2,0,0,655,4530,4470,4500,4455\n";
+        // Device voltage_now: 4434000 uV = the framework's 4434 mV input.
+        // bms/voltage_now was unavailable. Current and voltage were separate probes.
+        // Three bracketed CURRENT_NOW calls matched the -753 mA gauge reading.
+        ColorOsBattery.Sample device = new ColorOsBattery(actual).sample(firmware, -753, 4434, 0);
+        check(device.seriesCells == 2 && device.cellsSource.equals("aging_ffc_data"),
+                "the actual Android 17 aging_ffc_data record detects two series cells");
+        check(device.voltageMilliVolts == 8868 && device.voltageSource.equals("single_cell_x2"),
+                "the actual single-cell voltage is doubled once when BMS voltage is unavailable");
+        check(device.currentMicroAmps == -753000, "the matched API/gauge current only changes units");
+        check(Math.abs(wattsOf(device.currentMicroAmps, device.voltageMilliVolts) - 6.677604f) < 0.00001f,
+                "verified device input fixtures account for the entire series pack");
+        check(powerText(wattsOf(device.currentMicroAmps, device.voltageMilliVolts)).equals("6.7W"),
+                "verified inputs keep the shared decimal format");
+        check(powerText(wattsOf(device.currentMicroAmps, 4434)).equals("3.3W"),
+                "fixture reproduces the previous single-cell undercount");
+
         ColorOsBattery.Sample alreadyPack = sampler.sample(firmware, -496, 8930, 3000);
         check(alreadyPack.voltageMilliVolts == 8930 && nodes.packReads == 1,
                 "an existing pack voltage is not doubled or queried again");

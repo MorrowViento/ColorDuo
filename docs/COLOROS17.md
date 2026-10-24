@@ -108,17 +108,21 @@ ColorOS 的网络类型值是 `OplusNetworkTypeTextModel`，含有具体文字�
 
 覆盖安装 alpha4 后重启 SystemUI，检查已有网络类型组件在 5G/4G 切换、Wi-Fi 切换和飞行模式下更新；插电时功率应随实际电流变化。日志首个 `ColorOS battery` 样本包含原始电流、单位、归一化电流和电压；开启调试日志可持续记录变化。未访问 root 命令或 sysfs 作为运行时数据源。
 
-## 双电芯功率适配（待发布）
+## 0.1.1：双电芯功率适配
 
 `0.1.0` 以前只校正电流单位，随后直接使用 `ACTION_BATTERY_CHANGED` 电压；未区分单节与整包电压。上面的 `2.21464 W` 是单位修复后按 4465 mV 计算的结果，不能据此证明已统计整包功率。
 
 OnePlus 官方 [SM8750 充电驱动](https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8750/blob/d50b305f7da9e14715a25120a4ac7b1a4b8b97c3/vendor/oplus/kernel/charger/v2/oplus_chg_gki.c) 的 battery `VOLTAGE_NOW` 使用 `GAUGE_ITEM_VOL_MAX`，`CURRENT_NOW` 直接返回 gauge 电流。[gauge 实现](https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8750/blob/d50b305f7da9e14715a25120a4ac7b1a4b8b97c3/vendor/oplus/kernel/charger/v2/mms/oplus_mms_gauge.c) 明确将 `batt_num == 2` 用于 2S 检查。[configfs 实现](https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8750/blob/d50b305f7da9e14715a25120a4ac7b1a4b8b97c3/vendor/oplus/kernel/charger/v2/oplus_configfs.c) 的 `aging_ffc_data` 第二字段即该串联数量。该源码属于厂商公开参考，目标 Android 17 固件仍需与实际接口读数对照。
 
-候选适配在采样入口读取 `/sys/class/oplus_chg/battery/aging_ffc_data`，缓存检测到的双串联数量。若单节电压不超过 5000 mV，优先使用可读且符合整包范围的 `/sys/class/power_supply/bms/voltage_now`；没有整包读数时折算为两节电压。已经上报整包电压、单电芯和未知拓扑均不重复乘倍数。参考固件可在节点不可读时使用已知硬件配置回退；未知固件保持原有接口口径。
+适配在采样入口读取 `/sys/class/oplus_chg/battery/aging_ffc_data`，缓存检测到的双串联数量。若单节电压不超过 5000 mV，优先使用可读且符合整包范围的 `/sys/class/power_supply/bms/voltage_now`；没有整包读数时折算为两节电压。已经上报整包电压、单电芯和未知拓扑均不重复乘倍数。参考固件可在节点不可读时使用已知硬件配置回退；未知固件保持原有接口口径。
 
 所有文件只读，单次读取最多 512 字节；节点不可读、格式无效或驱动尚未初始化时，最多每分钟重试一次。采样位于原有低频电池刷新路径，绘制回调不做文件访问，也不运行 root 命令。日志增加 `seriesCells`、`cellsSource`、`powerVoltageMilliVolts`、`voltageSource`，可区分硬件检测、固件回退、整包电压和单节折算。
 
-离线测试已覆盖单节、双串联、整包不重复翻倍、BMS 单节/整包区别、并联合计电流不加倍、权限失败、冷启动恢复、unknown/零读数及共享格式化。按串联电流 496 mA、单节电压 4465 mV 的夹具，整包结果为 4.42928 W；手机实际电流接口是否已额外折算，待紧邻读取的内核和 Binder 样本核验。
+离线测试已覆盖单节、双串联、整包不重复翻倍、BMS 单节/整包区别、并联合计电流不加倍、权限失败、冷启动恢复、unknown/零读数及共享格式化。按串联电流 496 mA、单节电压 4465 mV 的夹具，整包结果为 4.42928 W。
+
+用户进一步连续采集三组 `current_now` → Binder CURRENT_NOW → `current_now`，每组内核前后均为 `-753`，Parcel 为低字 `fffffd0f`、高字 `ffffffff`，解码同样为 `-753`。这确认参考固件接口电流未预先乘双电芯倍率。
+
+随后读取 `aging_ffc_data` 得到 `0,2,0,0,655,4530,4470,4500,4455`，第二字段确认两串联电芯；battery `voltage_now` 为 `4434000` µV，即 4434 mV 单节电压；BMS 整包电压节点不可用。对应归一化电压为 8868 mV。将真实输入作为回归夹具组合时，753 mA 对应 6.677604 W，上游格式显示 `6.7W`；旧版按单节计算为 3.338802 W，显示 `3.3W`。电流与电压来自分开的探测，不将这个组合数值当作同一时刻的实测功率。硬件口径已据此核验，修复后的实际 SystemUI 显示仍需手机运行确认。
 
 ## alpha5：对齐跨页面接管范围
 
