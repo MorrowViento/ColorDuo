@@ -1,6 +1,6 @@
 # ColorDuo
 
-专注 **ColorOS 17** 的状态栏三合一图标模块，由 [chorusfruit-233](https://github.com/chorusfruit-233) 独立维护，fork 自 [HyperDuo](https://github.com/yixing233/HyperDuo)。
+专注 **ColorOS 17** 的状态栏三合一图标模块，完全由 Codex 维护，fork 自 [HyperDuo](https://github.com/yixing233/HyperDuo)。
 
 支持电池、Wi-Fi、双卡信号和网络类型的组合布局，以及充电功率、温度和自定义配色。
 

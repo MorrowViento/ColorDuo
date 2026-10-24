@@ -2,7 +2,7 @@
 
 面向 **ColorOS 17** 的状态栏三合一图标模块，将电池、Wi-Fi 和移动信号整合为一个可配置的图标。
 
-由 [chorusfruit-233](https://github.com/chorusfruit-233) 独立维护，fork 自 [HyperDuo](https://github.com/yixing233/HyperDuo)。
+完全由 Codex 维护，fork 自 [HyperDuo](https://github.com/yixing233/HyperDuo)。
 
 [下载测试包](https://github.com/chorusfruit-233/ColorDuo/actions/workflows/build.yml) · [配置说明](docs/CONFIGURATION.md) · [更新记录](docs/CHANGELOG.md) · [问题反馈](https://github.com/chorusfruit-233/ColorDuo/issues)
 

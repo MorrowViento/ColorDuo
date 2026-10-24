@@ -1,6 +1,6 @@
 # ColorDuo 开发指南
 
-本仓库由 chorusfruit-233 独立维护，开发目标是 **ColorOS 17**。当前参考一加 13 / PJZ110、Android 17、SystemUI 17.99.02。设备、固件和验收进展见 [适配记录](COLOROS17.md)。
+本项目完全由 Codex 维护，开发目标是 **ColorOS 17**。当前参考一加 13 / PJZ110、Android 17、SystemUI 17.99.02。设备、固件和验收进展见 [适配记录](COLOROS17.md)。
 
 ## 项目标识
 
@@ -95,4 +95,4 @@ adb logcat -v time -s LSPosedFramework | rg 'ColorDuo|io\.github\.chorusfruit233
 
 用户配置见 [CONFIGURATION.md](CONFIGURATION.md)，本项目版本记录见 [CHANGELOG.md](CHANGELOG.md)。继承的 [HyperDuo 开发文档](DEVELOPMENT.md)、旧截图、发布说明和验证清单作为历史资料保留，其环境与结论需要与 ColorDuo 当前验证范围区分。
 
-共享代码保留 yixing233 与 HyperDuo 贡献者署名，ColorOS 17 适配由 ColorDuo 仓库维护，许可证为 [GPL-3.0-only](../LICENSE)。
+共享代码保留 yixing233 与 HyperDuo 贡献者署名，ColorOS 17 适配完全由 Codex 维护，许可证为 [GPL-3.0-only](../LICENSE)。

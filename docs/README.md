@@ -1,6 +1,6 @@
 # ColorDuo 文档
 
-ColorDuo 是 `chorusfruit-233/ColorDuo` 独立维护的 HyperDuo fork，当前专注 **ColorOS 17**。本目录同时保留项目现行说明和继承的上游历史资料。
+ColorDuo 是完全由 Codex 维护的 HyperDuo fork，当前专注 **ColorOS 17**。本目录同时保留项目现行说明和继承的上游历史资料。
 
 ## 当前文档
 

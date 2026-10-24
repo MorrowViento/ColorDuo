@@ -1,6 +1,6 @@
 # ColorDuo：ColorOS 17 适配与验证
 
-ColorDuo 是由 chorusfruit-233 独立维护、专注 ColorOS 17 的 HyperDuo fork。本页记录本仓库的系统接入、参考固件证据与验证进展。各 alpha 章节保留对应版本的修复记录；当前安装和配置见 [项目首页](../README.md)、[配置说明](CONFIGURATION.md)，本项目版本历史见 [更新记录](CHANGELOG.md)。
+ColorDuo 是完全由 Codex 维护、专注 ColorOS 17 的 HyperDuo fork。本页记录本仓库的系统接入、参考固件证据与验证进展。各 alpha 章节保留对应版本的修复记录；当前安装和配置见 [项目首页](../README.md)、[配置说明](CONFIGURATION.md)，本项目版本历史见 [更新记录](CHANGELOG.md)。
 
 ## 参考固件
 
@@ -37,7 +37,7 @@ alpha5 接管 `StatBatteryMeterView` 的各个实例，包括主状态栏、锁�
 
 ## 共享代码来源与当前规则
 
-当前共享代码基线为 HyperDuo `e9dffbcc8f65a5f3dc379c0b25ccdc0462a8a28d`。本版本保留该基线的绘图、组件排序与配置迁移；ColorOS 系统接入和参考固件的数据单位归一化由 ColorDuo 实现。版本号、下载、问题跟踪与平台验证由本仓库独立维护。
+当前共享代码基线为 HyperDuo `e9dffbcc8f65a5f3dc379c0b25ccdc0462a8a28d`。本版本保留该基线的绘图、组件排序与配置迁移；ColorOS 系统接入和参考固件的数据单位归一化由 ColorDuo 实现。版本号、下载、问题跟踪与平台验证由 Codex 维护。
 
 - `TrioSettings`、`TrioAppearance`、`TrioRenderer`、预览与绘图设置沿用上游。`Prefs` 仅改变独立应用的重载广播名。
 - 圆环初始组件区为空，分卡组件默认关闭；不再预设 Wi-Fi、卡一/卡二的优先列表。
