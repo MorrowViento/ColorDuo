@@ -67,8 +67,23 @@ final class ColorOsHooks {
     private static boolean tickerStarted;
     private static Class<?> meterClass;
     private static Class<?> phoneBarClass;
+    private static Class<?> statusIconsClass;
     private static Context context;
     private static String lastBatterySample;
+    private static long nextSimPoll;
+    private static final ColorOsLayout.Tree<View> VIEW_TREE = new ColorOsLayout.Tree<>() {
+        @Override public View parent(View view) {
+            return view.getParent() instanceof View ? (View) view.getParent() : null;
+        }
+        @Override public String id(View view) { return resourceName(view); }
+        @Override public int childCount(View view) {
+            return view instanceof ViewGroup ? ((ViewGroup) view).getChildCount() : 0;
+        }
+        @Override public View childAt(View view, int index) { return ((ViewGroup) view).getChildAt(index); }
+        @Override public boolean isIconContainer(View view) {
+            return statusIconsClass != null && statusIconsClass.isInstance(view);
+        }
+    };
 
     private ColorOsHooks() {}
 
@@ -90,6 +105,7 @@ final class ColorOsHooks {
     static void install(XposedModule module, ClassLoader loader) {
         meterClass = Refl.cls(METER_CLASS, loader);
         phoneBarClass = Refl.cls("com.android.systemui.statusbar.phone.PhoneStatusBarView", loader);
+        statusIconsClass = Refl.cls("com.android.systemui.statusbar.phone.StatusIconContainer", loader);
         wifiActiveClass = Refl.cls(WIFI + "shared.model.WifiNetworkModel$Active", loader);
         wifiCarrierMergedClass = Refl.cls(WIFI + "shared.model.WifiNetworkModel$CarrierMerged", loader);
         for (String name : new String[] {"Inactive", "Unavailable", "Invalid"}) {
@@ -406,6 +422,11 @@ final class ColorOsHooks {
     }
 
     private static Object value(Object flow) { return Refl.callByName(flow, "getValue"); }
+    private static String resourceName(View view) {
+        if (view == null || view.getId() == View.NO_ID) return "";
+        try { return view.getResources().getResourceEntryName(view.getId()); }
+        catch (android.content.res.Resources.NotFoundException ignored) { return ""; }
+    }
     private static int integer(Object value, int fallback) {
         return value instanceof Number ? ((Number) value).intValue() : fallback;
     }
@@ -478,6 +499,7 @@ final class ColorOsHooks {
         final Glyph glyph;
         final Map<View, Integer> nativeVisibility = new IdentityHashMap<>();
         final Map<View, Integer> visibilityOverrides = new IdentityHashMap<>();
+        final Set<View> nativeTypes = Collections.newSetFromMap(new IdentityHashMap<>());
         final ColorOsPolicy.SlotOwnership slots = new ColorOsPolicy.SlotOwnership();
         ImageView image;
         ViewGroup iconContainer;
@@ -519,8 +541,12 @@ final class ColorOsHooks {
                 nativeParams = new LinearLayout.LayoutParams((LinearLayout.LayoutParams) image.getLayoutParams());
             }
             nativeScaleType = image.getScaleType();
+            for (View child : nativeVisibility.keySet()) {
+                if (childOwner(child) == this) CHILDREN.remove(child);
+            }
             nativeVisibility.clear();
             visibilityOverrides.clear();
+            nativeTypes.clear();
             for (String name : new String[] {"battery_icon_view", "battery_content",
                     "battery_charge_icon", "battery_charge_reverse", "battery_percentage_view"}) {
                 View child = find(name);
@@ -542,13 +568,6 @@ final class ColorOsHooks {
             }
         }
 
-        boolean primaryBar() {
-            for (ViewParent p = meter.getParent(); p instanceof View; p = p.getParent()) {
-                if (phoneBarClass.isInstance(p)) return true;
-            }
-            return false;
-        }
-
         void apply() {
             boolean previous = moduleWriting;
             moduleWriting = true;
@@ -559,7 +578,9 @@ final class ColorOsHooks {
         void applyInternal() {
             if (nativeDepth != 0) return;
             if (image == null) capture();
-            boolean wanted = !failed && TrioConfig.get().enabled && primaryBar()
+            // Like upstream's class-wide battery draw hook, every supported meter instance
+            // can carry the glyph, including keyguard and expanded/collapsed shade headers.
+            boolean wanted = !failed && TrioConfig.get().enabled
                     && meter.isAttachedToWindow() && meter.getVisibility() == View.VISIBLE
                     && image != null && nativeParams != null;
             if (!wanted) {
@@ -601,7 +622,11 @@ final class ColorOsHooks {
             glyph.invalidateSelf();
             if (!logged) {
                 logged = true;
-                TrioHooks.log(TrioHooks.LOG_INFO, "ColorOS host active: level=" + state.level + " wifiFlow=" + (wifiFlow != null)
+                View row = ColorOsLayout.rowFor(meter, VIEW_TREE);
+                View root = row == null ? null : VIEW_TREE.parent(row);
+                TrioHooks.log(TrioHooks.LOG_INFO, "ColorOS host active: meter=" + resourceName(meter)
+                        + " row=" + resourceName(row) + " parent=" + (root == null ? "none" : root.getClass().getName())
+                        + " level=" + state.level + " wifiFlow=" + (wifiFlow != null)
                         + " wifiLevel=" + state.wifiLevel + " wifiPresent=" + state.wifiPresent
                         + " mobileSubscriptions=" + MOBILES.size());
             }
@@ -711,7 +736,10 @@ final class ColorOsHooks {
             long now = SystemClock.elapsedRealtime();
             if (now < nextSignalSample) return;
             nextSignalSample = now + 1000L;
-            TrioState.pollSimsNow();
+            if (now >= nextSimPoll) {
+                nextSimPoll = now + 1000L;
+                TrioState.pollSimsNow();
+            }
             state.slotLevels = TrioState.sSlotLevels.clone();
             state.mobileLevel = -1;
             state.mobileType = "";
@@ -773,17 +801,22 @@ final class ColorOsHooks {
 
         void releaseSlots() { updateSlots(Collections.emptySet()); }
 
+        void releaseNativeTypes() {
+            for (View type : nativeTypes) {
+                hide(type, false);
+                nativeVisibility.remove(type);
+                visibilityOverrides.remove(type);
+                if (childOwner(type) == this) CHILDREN.remove(type);
+            }
+            nativeTypes.clear();
+        }
+
         void syncSlots(TrioAppearance appearance) {
-            if (iconContainer == null) {
-                int id = meter.getResources().getIdentifier("statusIcons", "id", "com.android.systemui");
-                for (ViewParent p = meter.getParent(); p instanceof ViewGroup; p = p.getParent()) {
-                    View found = ((ViewGroup) p).findViewById(id);
-                    if (found instanceof ViewGroup && found != meter) {
-                        iconContainer = (ViewGroup) found;
-                        break;
-                    }
-                    if (phoneBarClass.isInstance(p)) break;
-                }
+            View resolved = ColorOsLayout.iconsFor(meter, VIEW_TREE);
+            if (iconContainer != resolved) {
+                releaseSlots();
+                releaseNativeTypes();
+                iconContainer = resolved instanceof ViewGroup ? (ViewGroup) resolved : null;
             }
             Set<String> wanted = new HashSet<>();
             if (iconContainer != null) for (int i = 0; i < iconContainer.getChildCount(); i++) {
@@ -802,6 +835,7 @@ final class ColorOsHooks {
                             nativeVisibility.put(type, type.getVisibility());
                             CHILDREN.put(type, new WeakReference<>(this));
                         }
+                        nativeTypes.add(type);
                         hide(type, appearance.ownsType());
                     }
                 }
@@ -821,10 +855,12 @@ final class ColorOsHooks {
         void syncExtra(TrioAppearance appearance) {
             if (extra == null) {
                 ViewParent parent = meter.getParent();
-                if (!(parent instanceof LinearLayout)) return;
-                LinearLayout row = (LinearLayout) parent;
+                // QS uses ConstraintLayout with an end-to-start battery constraint. Put the
+                // strip inside its LinearLayout meter so the battery's measured width reserves
+                // space automatically. Standard status/keyguard rows accept a sibling strip.
+                ViewGroup row = parent instanceof LinearLayout ? (ViewGroup) parent : meter;
                 extra = new ColorOsReadings(meter.getContext(), state, image);
-                row.addView(extra, row.indexOfChild(meter), new LinearLayout.LayoutParams(
+                row.addView(extra, row == meter ? 0 : row.indexOfChild(meter), new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
             }
             extra.update(appearance);
@@ -835,6 +871,7 @@ final class ColorOsHooks {
         }
         @Override public void onViewDetachedFromWindow(View view) {
             restore();
+            releaseNativeTypes();
             iconContainer = null;
             if (extra != null && extra.getParent() instanceof ViewGroup) {
                 ((ViewGroup) extra.getParent()).removeView(extra);

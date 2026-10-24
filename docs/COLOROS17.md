@@ -27,7 +27,11 @@ ColorDuo 是由 chorusfruit-233 独立维护、专注 ColorOS 17 的 HyperDuo fo
 | 充电功率 | `BatteryManager.CURRENT_NOW` 经参考固件单位归一化后，传给上游 `BatteryPresence` 的原有计算 |
 | 原生图标 | `StatusIconContainer.mIgnoredSlots`；仅撤销模块自己添加的 slot |
 
-模块只接管 `PhoneStatusBarView` 下的电池实例。原生 Drawable、尺寸、ScaleType 和子视图可见性在接管前保存；系统更新完成后重新记录。异常时恢复原生显示，不再接管该实例。
+alpha5 接管 `StatBatteryMeterView` 的各个实例，包括主状态栏、锁屏、下拉通知栏与控制面板头部。原生 Drawable、尺寸、ScaleType 和子视图可见性按实例保存，系统更新完成后重新记录；某个实例异常时只恢复它的原生显示。
+
+原生图标与电池的关联限定在最近的 `system_icons` 或 `quick_qs_status_icons` 内，支持 QS 图标位于 `icons` 子容器、电池位于 ConstraintLayout 另一侧的结构。查找会跳过其他嵌套图标行，存在多个候选时保留原生图标。通知栏动画把整行移入 fake container 后，仍使用该行自己的图标；重新绑定时释放旧行所有权和网络类型可见性。
+
+主状态栏/锁屏在普通 LinearLayout 行内为读数组保留空间；QS 的环外读数组挂在电池内部的 LinearLayout 中，随电池一起测量、显隐。原生时钟隐藏只作用于主状态栏小时钟，面板和锁屏自己的大时钟保持系统布局。
 
 绘图使用单独的 Canvas layer，避免上游渲染器清屏时影响相邻图标。电话服务采样限制为每秒一次，Wi-Fi 模型与连接通知独立更新缓存，绘制回调不访问电话服务；熄屏时降低刷新频率。系统流缺失时可使用已有平台采样兜底；缺少电量时不隐藏原生图标。
 
@@ -52,7 +56,7 @@ ColorDuo 是由 chorusfruit-233 独立维护、专注 ColorOS 17 的 HyperDuo fo
 4. Wi-Fi 关闭、断连、重连；飞行模式；切换默认数据卡、停用 SIM；检查没有残留信号。
 5. 插拔充电器、VOOC、低电量、省电模式、深浅色背景、横屏和屏幕熄灭后唤醒。
 6. 切换系统电池样式，关闭模块后检查原生样式恢复。
-7. 打开锁屏和快捷设置，确认本版仍使用原生布局。
+7. 分别展开通知栏和控制面板、进入锁屏、再返回桌面；检查已配置的三合一组件、原生信号交接、配色和环外读数都随所在页面正确更新，关闭模块后各行恢复原生。
 
 记录手机完整系统版本、LSPosed 版本、操作步骤、前后截图及 ColorDuo 的加载/错误日志即可定位问题。
 
@@ -60,7 +64,7 @@ ColorDuo 是由 chorusfruit-233 独立维护、专注 ColorOS 17 的 HyperDuo fo
 
 已提供信号换算、slot 所有权释放、默认配置、配置传输和渲染测试，并构建可安装 APK。云端无法连接目标手机，因此这些检查不代表已经通过真机验收。
 
-当前验收以主状态栏圆环为准。胶囊绘图、原生时钟交接和环外间距已按共享规则接线，尚需目标手机验证。ColorOS 特殊通知/充电动画仍需独立验收；锁屏和快捷设置区域暂不接管。各项功能需按 ColorOS 17 的目标固件记录结果。
+alpha5 已将代码接管范围扩展到主状态栏、锁屏和下拉通知/QS 头部。夹具检查覆盖生产 Host 接管、原生状态恢复、局部容器与视图迁移，但不运行真实 ROM 的生命周期或 GPU 动画。跨页面的实际配色、展开/收起过渡、胶囊、时钟交接和 ColorOS 特殊充电动画仍需目标手机逐项验收。
 
 测试签名沿用原仓库开发密钥；测试 APK 通过 Actions artifact 分发，工作流不自动发布 Release，不修改用户已有的 SystemUI 草稿附件。
 
@@ -103,3 +107,13 @@ ColorOS 的网络类型值是 `OplusNetworkTypeTextModel`，含有具体文字�
 `python3 tests/coloros-power.py` 提取并执行生产代码中的 `wattsOf`、`powerText`、`perfText`，覆盖实际 Binder 样本、单位误差复现、格式化、真实零、unknown、溢出、正负电流、充满但仍插电、拔电和温度双行。网络模型测试覆盖 backing field、接口 getter、原生图标映射、前后缀及空值。共享源码一致性检查保留，功率公式未修改。
 
 覆盖安装 alpha4 后重启 SystemUI，检查已有网络类型组件在 5G/4G 切换、Wi-Fi 切换和飞行模式下更新；插电时功率应随实际电流变化。日志首个 `ColorOS battery` 样本包含原始电流、单位、归一化电流和电压；开启调试日志可持续记录变化。未访问 root 命令或 sysfs 作为运行时数据源。
+
+## alpha5：对齐跨页面接管范围
+
+上游在 `MiuiBatteryMeterIconView.onDraw` 按类接入绘图，登记各实例并管理它们所在的主状态栏、锁屏、控制中心和 QS 图标行，还专门处理锁屏行的附着与图标折叠。ColorDuo alpha4 额外要求电池具有 `PhoneStatusBarView` 祖先，导致其他页面保留原生图标，也会排除被通知栏动画移入 fake container 的状态栏行。
+
+alpha5 撤回该主状态栏限定，让同类电池实例都能承载共享绘图。图标查找独立于主状态栏祖先，按当前局部行绑定；每个实例保持独立的原生 Drawable、配色输入、尺寸和可见性快照，QS 的 ConstraintLayout 通过电池内部读数组完成占位。电话服务兜底采样改为进程级限频，多个头部实例共用采样结果。
+
+`python3 tests/coloros-hosts.py` 执行生产 `applyInternal`、`restoreBatteryInternal` 和 `syncExtra`，验证四个上下文都接管、单实例异常/卸载/禁用恢复，以及 QS 内部读数组挂载。局部容器夹具覆盖真实资源中的 `system_icons` 和 `quick_qs_status_icons` 关系、整行迁移、嵌套行与歧义候选。alpha4 原代码会在新增的跨页面接管断言中失败。
+
+共享源码一致性检查继续保护绘图和配置规则；它本身不验证平台接入范围，跨页面回归由新增检查和目标设备验收补充。复测 alpha5 时应分别记录桌面、通知栏、控制面板和锁屏的状态，再检查收起/展开过程及关闭模块后的恢复。首个 host 日志现在包含电池 ID、局部行 ID 和所在容器类型。

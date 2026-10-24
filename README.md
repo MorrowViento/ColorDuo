@@ -6,9 +6,9 @@ ColorDuo 是由 [chorusfruit-233](https://github.com/chorusfruit-233) 独立维�
 
 本项目复用 HyperDuo 的绘图、配置与设置界面，为 ColorOS 17 维护自己的 SystemUI 适配、版本、测试和问题跟踪。ColorDuo 的支持范围、下载和使用说明以本仓库为准。
 
-当前测试版本：**`0.1.0-alpha4`**。
+当前测试版本：**`0.1.0-alpha5`**。
 
-[下载测试包](https://github.com/chorusfruit-233/ColorDuo/actions/runs/40080394596/artifacts/12555017705) · [构建列表](https://github.com/chorusfruit-233/ColorDuo/actions/workflows/build.yml) · [配置说明](docs/CONFIGURATION.md) · [更新记录](docs/CHANGELOG.md) · [问题反馈](https://github.com/chorusfruit-233/ColorDuo/issues)
+[下载测试包与构建列表](https://github.com/chorusfruit-233/ColorDuo/actions/workflows/build.yml) · [配置说明](docs/CONFIGURATION.md) · [更新记录](docs/CHANGELOG.md) · [问题反馈](https://github.com/chorusfruit-233/ColorDuo/issues)
 
 ## 适配范围
 
@@ -23,7 +23,7 @@ ColorDuo 是由 [chorusfruit-233](https://github.com/chorusfruit-233) 独立维�
 
 其他 ColorOS 17 机型和固件需要单独验证。HyperOS、MIUI 和其他系统版本不属于本项目当前的适配范围。
 
-模块目前接管**主状态栏**。锁屏和快捷设置区域保持原生显示。构建与离线检查已通过；alpha4 的网络类型、功率修复以及双卡、胶囊、时钟交接和特殊动画仍需目标手机验证，详见 [适配与验证记录](docs/COLOROS17.md)。
+alpha5 已将同类电池视图的接管扩展到**主状态栏、下拉通知栏、控制面板头部和锁屏**。每个实例管理自己所在行的图标与恢复状态，目标是保持与上游一致的跨页面显示。离线检查覆盖接管、容器隔离和迁移恢复；实际展开/收起动画、跨页面配色、双卡、胶囊及特殊动画仍需目标手机验证，详见 [适配与验证记录](docs/COLOROS17.md)。
 
 ## 功能
 
@@ -76,6 +76,7 @@ python3 tests/upstream-parity.py
 sh tests/coloros-policy.sh
 sh tests/coloros-settings.sh
 python3 tests/coloros-power.py
+python3 tests/coloros-hosts.py
 ./gradlew :app:assembleDebug
 ```
 

@@ -10,7 +10,7 @@
 | 仓库 | `chorusfruit-233/ColorDuo` |
 | 应用 ID | `io.github.chorusfruit233.colorduo` |
 | 源码 namespace | `io.github.yixing233.hyperduo`，沿用共享源码的命名 |
-| 测试版本 | `0.1.0-alpha4` / `10004` |
+| 测试版本 | `0.1.0-alpha5` / `10005` |
 | compileSdk / targetSdk / minSdk | 37 / 36 / 29 |
 | 框架 API | libxposed 102 |
 | 作用域 | `com.android.systemui` |
@@ -40,6 +40,7 @@ Windows 可使用 `gradlew.bat --no-daemon :app:assembleDebug`。首次构建需
 | `HyperDuoModule.java` | 框架入口，选择系统适配器 |
 | `ColorOsHooks.java` | ColorOS 视图接管、原生更新跟踪、状态流捕获与恢复 |
 | `ColorOsPolicy.java` | 模型解析、信号换算、参考固件电流单位及 slot 所有权规则 |
+| `ColorOsLayout.java` | 主状态栏、锁屏与通知/QS 头部的本地容器关联，隔离各行图标 |
 | `ColorOsReadings.java` | 在 ColorOS 原生布局中挂载环外读数组，复用共享绘制与排版函数 |
 | `BatteryPresence.java` / `WifiPresence.java` | 框架状态采样；电流在采样入口进行 ROM 单位适配 |
 | `Prefs.java` / `TrioSettings.java` / `TrioConfig.java` | 配置定义、传输和热更新 |
@@ -47,7 +48,9 @@ Windows 可使用 `gradlew.bat --no-daemon :app:assembleDebug`。首次构建需
 | `TrioPreviewView.java` / `ui/` | 设置界面与模拟预览 |
 | `TrioHooks.java` / `GlyphDrawable.java` | 保留的 MIUI 接入及部分共享辅助函数 |
 
-主状态栏绘图由原生电池的 `battery_icon_view` 承载，独立 Canvas layer 限定共享渲染器的清屏范围。系统写入会更新原生快照，模块关闭或接管失败时使用该快照恢复。锁屏和快捷设置区域当前保持原生。
+绘图由每个原生电池实例的 `battery_icon_view` 承载，独立 Canvas layer 限定共享渲染器的清屏范围。alpha5 与上游的按类接入方式对齐，覆盖主状态栏、锁屏和下拉通知/QS 头部。系统写入更新各自原生快照，模块关闭或该实例接管失败时恢复对应视图。
+
+图标只在电池最近的 `system_icons` 或 `quick_qs_status_icons` 行内查找，找不到或存在歧义时保留原生图标。QS 使用 ConstraintLayout，环外读数挂在电池内部的 LinearLayout 中，由电池宽度为其占位；普通状态栏与锁屏使用同一行的兄弟视图。原生时钟隐藏仍限定主状态栏，不接管锁屏和面板的大时钟。
 
 网络类型应从 ColorOS 原生映射模型取值，按真实订阅与卡槽匹配。电流单位修正目前限定于已验证的完整固件指纹；扩展固件时，需要记录原始接口值和单位证据，保持 µA 输入、电压 mV 与共享功率公式一致。
 
@@ -58,14 +61,15 @@ python3 tests/upstream-parity.py
 sh tests/coloros-policy.sh
 sh tests/coloros-settings.sh
 python3 tests/coloros-power.py
+python3 tests/coloros-hosts.py
 ./gradlew --no-daemon :app:assembleDebug
 ```
 
-这四组离线检查分别覆盖共享源码基线、ColorOS 原生模型与图标交接、配置与绘图，以及实际电流样本到功率格式化的路径。Python 检查需要 Python 3，Java 检查使用 JDK 21。`upstream-parity.py` 读取固定基线提交，CI 使用完整提交历史。
+这五组离线检查覆盖共享源码基线、ColorOS 原生模型与图标交接、配置与绘图、实际电流样本到功率格式化，以及多页面电池接管和恢复。跨页面检查执行生产 Host 的接管、恢复与读数挂载方法，并检查独立行及视图迁移；不模拟真实 GPU、SystemUI 动画或 ROM 生命周期。Python 检查需要 Python 3，Java 检查使用 JDK 21。`upstream-parity.py` 读取固定基线提交，CI 使用完整提交历史。
 
 共享规则当前继承自 HyperDuo `e9dffbcc8f65a5f3dc379c0b25ccdc0462a8a28d`。一致性检查允许独立应用标识、刷新分发、别名定位、辅助函数访问和采样单位适配，保护现有绘图、布局、迁移及功率公式。ColorOS 系统差异在适配层维护。
 
-`tests/` 中其他 PowerShell 脚本继承自上游，记录了不同时间的接口与环境。ColorDuo 当前检查入口为以上四项和 [CI 工作流](../.github/workflows/build.yml)。源码或构建检查通过后，仍需按 [真机验收项目](COLOROS17.md#第一轮真机验收) 记录目标固件表现。
+`tests/` 中其他 PowerShell 脚本继承自上游，记录了不同时间的接口与环境。ColorDuo 当前检查入口为以上五项和 [CI 工作流](../.github/workflows/build.yml)。源码或构建检查通过后，仍需按 [真机验收项目](COLOROS17.md#第一轮真机验收) 记录目标固件表现。
 
 ## 调试与反馈
 
