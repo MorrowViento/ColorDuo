@@ -35,14 +35,14 @@
 
 | 项目 | 当前情况 |
 | --- | --- |
-| 申请者与包名 | **不匹配**：`chorusfruit-233` 经机器人规范化后是 `chorusfruit_233`，要求前缀 `io.github.chorusfruit_233.`；当前为 `io.github.chorusfruit233.colorduo` |
+| 申请者与包名 | **匹配**：`chorusfruit-233` 经机器人规范化后是 `chorusfruit_233`；alpha6 起应用 ID 为 `io.github.chorusfruit_233.colorduo` |
 | Xposed APK 结构 | 具有 `META-INF/xposed/module.prop`、`java_init.list`、`scope.list`，API 102；模块仓支持这种现代格式 |
 | 模块介绍与摘要 | 已有 `module-README.md` 和 `module-SUMMARY`，复制到模块仓后对应 `README.md`、`SUMMARY`；介绍中的链接使用源码仓库绝对地址 |
-| 可公开下载的版本 | 当前只有 Actions 测试包，没有公开发布的 ColorDuo Release APK；现有 SystemUI 草稿是适配参考文件 |
-| 发布签名 | 测试包使用公开开发签名；正式发布需配置并验证上述四项 secrets。私有签名是本项目发布流程的要求，submission 机器人并未规定这一条件 |
-| 模块仓申请与设置 | 本次查询未找到 ColorDuo 的申请和模块仓；仍需申请、接受邀请，填写仓库 Description（模块名）和 Homepage（支持链接） |
+| 可公开下载的版本 | 正在准备 `0.1.0-alpha6` / `10006` 的签名 APK；现有 SystemUI 草稿是适配参考文件 |
+| 发布签名 | 用户已配置上述四项 secrets，通过发布构建验证后使用。私有签名是本项目发布流程的要求，submission 机器人并未规定这一条件 |
+| 模块仓申请与设置 | 待签名 APK 验证后提交申请、接受邀请并配置模块仓资料 |
 
-**结论：当前包名不满足自动审核条件，尚不具备直接上架并展示的完整条件。** 本次保留应用 ID；改包名会成为独立安装的新应用，已有配置不会自动迁移。
+**包名已满足账户前缀的自动审核规则，正在完成首次上架。** alpha6 使用新应用 ID 和发布签名，旧 alpha 配置不会自动迁移；具体升级步骤见 [配置说明](CONFIGURATION.md#升级与生效)。
 
 ## 申请与上架顺序
 
@@ -50,6 +50,6 @@
 2. 在 [submission](https://github.com/Xposed-Modules-Repo/submission) 新建 Issue，标题为 `[submission] <最终 applicationId>`，然后接受机器人发出的模块仓维护邀请。
 3. 在浏览器为模块仓设置 Description 为 `ColorDuo`，Homepage 指向源码仓库或 Issues。官方提示维护权限不足以通过 API 修改这些设置。
 4. 只上传模块说明与摘要，不把源码推入模块仓。将 `module-README.md` 作为 `README.md`、`module-SUMMARY` 作为 `SUMMARY`。
-5. 将同一签名 APK 发布到模块仓：Release 标题为版本名、正文为该版更新记录、tag 为 `<versionCode>-<versionName>`，例如 `10005-0.1.0-alpha5`。首次发布时同时附上有效 APK。
+5. 将同一签名 APK 发布到模块仓：Release 标题为版本名、正文为该版更新记录、tag 为 `<versionCode>-<versionName>`，例如 `10006-0.1.0-alpha6`。首次发布时同时附上有效 APK。
 
 官方说明完整资料及 Release 更新后通常需要 5～60 分钟显示。最终是否收录以模块仓机器人及维护者处理结果为准。

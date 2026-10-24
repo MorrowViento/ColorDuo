@@ -8,9 +8,9 @@
 | --- | --- |
 | 应用名 | ColorDuo |
 | 仓库 | `chorusfruit-233/ColorDuo` |
-| 应用 ID | `io.github.chorusfruit233.colorduo` |
+| 应用 ID | `io.github.chorusfruit_233.colorduo` |
 | 源码 namespace | `io.github.yixing233.hyperduo`，沿用共享源码的命名 |
-| 测试版本 | `0.1.0-alpha5` / `10005` |
+| 测试版本 | `0.1.0-alpha6` / `10006` |
 | compileSdk / targetSdk / minSdk | 37 / 36 / 29 |
 | 框架 API | libxposed 102 |
 | 作用域 | `com.android.systemui` |
@@ -88,7 +88,7 @@ adb logcat -v time -s LSPosedFramework | rg 'ColorDuo|io\.github\.chorusfruit233
 
 [Build ColorDuo](../.github/workflows/build.yml) 在 main 代码推送、PR 和手动触发时运行共用检查，再构建测试 APK，上传 `ColorDuo-<version>-debug-<commit>` artifact；文档修改不触发构建。产物打包步骤读取 APK 的实际版本，校验签名、现代 Xposed 入口及作用域，并附校验文件和构建信息。
 
-[Prepare release](../.github/workflows/release.yml) 手动构建私有签名的 release APK，通过版本、更新记录、签名和模块结构校验后创建 Release 草稿。具体 secrets、模块仓素材及当前包名审核阻碍见 [构建与模块仓发布](PUBLISHING.md)。
+[Prepare release](../.github/workflows/release.yml) 手动构建私有签名的 release APK，通过版本、更新记录、签名和模块结构校验后创建 Release 草稿。具体 secrets、模块仓素材及申请状态见 [构建与模块仓发布](PUBLISHING.md)。
 
 应用内更新地址指向 ColorDuo，仅接受 ColorDuo 命名的 APK。Actions artifact 与 GitHub Release 是不同分发入口；应用内更新依赖可用的稳定 Release APK。
 

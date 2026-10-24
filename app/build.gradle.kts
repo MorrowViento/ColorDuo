@@ -17,11 +17,11 @@ android {
 
     defaultConfig {
         // Keep the source namespace for upstream merges; install ColorDuo independently.
-        applicationId = "io.github.chorusfruit233.colorduo"
+        applicationId = "io.github.chorusfruit_233.colorduo"
         minSdk = 29
         targetSdk = 36
-        versionCode = tagVersionCode ?: 10005
-        versionName = tagVersionName ?: "0.1.0-alpha5"
+        versionCode = tagVersionCode ?: 10006
+        versionName = tagVersionName ?: "0.1.0-alpha6"
     }
 
     signingConfigs {

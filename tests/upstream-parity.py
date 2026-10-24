@@ -31,7 +31,7 @@ def normalize(name, data):
     # Permit identity, hook dispatch/access and ROM input-unit normalization. No rendering, defaults,
     # layout, preview, signal-selection or settings-migration changes are permitted.
     if name == "Prefs.java":
-        data = data.replace(b"io.github.chorusfruit233.colorduo.action.RELOAD",
+        data = data.replace(b"io.github.chorusfruit_233.colorduo.action.RELOAD",
                             b"io.github.yixing233.hyperduo.action.RELOAD")
     if name == "ui/SettingsScreen.kt":
         data = data.replace(b'MainActivity::class.java.name + "Alias"',

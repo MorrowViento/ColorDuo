@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Check publication failures without an Android SDK or signing credentials."""
 from pathlib import Path
+import re
 import runpy
 import subprocess
 import tempfile
@@ -41,6 +42,14 @@ class PublicationTest(unittest.TestCase):
         self.assertFalse("io.github.chorusfruit233.colorduo".startswith(prefix))
         self.assertTrue("io.github.chorusfruit_233.colorduo".startswith(prefix))
 
+    def test_project_identity_matches_submission_owner(self):
+        root = Path(__file__).resolve().parents[1]
+        gradle = (root / "app/build.gradle.kts").read_text()
+        application_id = re.search(r'applicationId\s*=\s*"([^"]+)"', gradle)[1]
+        self.assertTrue(application_id.startswith(api["github_prefix"]("chorusfruit-233")))
+        prefs = (root / "app/src/main/java/io/github/yixing233/hyperduo/Prefs.java").read_text()
+        self.assertIn(f'"{application_id}.action.RELOAD"', prefs)
+
     def check_module(self, prop=None, entry="io.github.yixing233.hyperduo.HyperDuoModule\n",
                      scope="com.android.systemui\n"):
         if prop is None:
@@ -69,28 +78,28 @@ class PublicationTest(unittest.TestCase):
             self.check_module(scope="android\n")
 
     def verify(self, badging, signature):
-        metadata = {"applicationId": "io.github.chorusfruit233.colorduo",
+        metadata = {"applicationId": "io.github.chorusfruit_233.colorduo",
                     "versionName": "0.1.0-alpha5", "versionCode": 10005}
         with mock.patch("subprocess.check_output", side_effect=[badging, signature]):
             return api["verify_apk"](Path("unused.apk"), "release", metadata, Path("unused-sdk"))
 
     def test_reject_development_signed_release(self):
-        badging = "package: name='io.github.chorusfruit233.colorduo' versionCode='10005' versionName='0.1.0-alpha5'\n"
+        badging = "package: name='io.github.chorusfruit_233.colorduo' versionCode='10005' versionName='0.1.0-alpha5'\n"
         with self.assertRaisesRegex(ValueError, "development signing key"):
             self.verify(badging, "Signer #1 certificate SHA-256 digest: " + api["DEVELOPMENT_CERT"])
 
     def test_reject_debuggable_release(self):
-        badging = "package: name='io.github.chorusfruit233.colorduo' versionCode='10005' versionName='0.1.0-alpha5'\napplication-debuggable\n"
+        badging = "package: name='io.github.chorusfruit_233.colorduo' versionCode='10005' versionName='0.1.0-alpha5'\napplication-debuggable\n"
         with self.assertRaisesRegex(ValueError, "debuggable"):
             self.verify(badging, "Signer #1 certificate SHA-256 digest: " + "a" * 64)
 
     def test_reject_wrong_apk_version(self):
-        badging = "package: name='io.github.chorusfruit233.colorduo' versionCode='10004' versionName='0.1.0-alpha4'\n"
+        badging = "package: name='io.github.chorusfruit_233.colorduo' versionCode='10004' versionName='0.1.0-alpha4'\n"
         with self.assertRaisesRegex(ValueError, "differs from Gradle"):
             self.verify(badging, "")
 
     def test_signature_verification_failure_propagates(self):
-        badging = "package: name='io.github.chorusfruit233.colorduo' versionCode='10005' versionName='0.1.0-alpha5'\n"
+        badging = "package: name='io.github.chorusfruit_233.colorduo' versionCode='10005' versionName='0.1.0-alpha5'\n"
         failure = subprocess.CalledProcessError(1, ["apksigner", "verify"])
         with self.assertRaises(subprocess.CalledProcessError):
             self.verify(badging, failure)

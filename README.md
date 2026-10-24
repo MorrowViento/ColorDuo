@@ -4,7 +4,7 @@
 
 完全由 Codex 维护，fork 自 [HyperDuo](https://github.com/yixing233/HyperDuo)。
 
-[下载测试包](https://github.com/chorusfruit-233/ColorDuo/actions/workflows/build.yml) · [配置说明](docs/CONFIGURATION.md) · [更新记录](docs/CHANGELOG.md) · [问题反馈](https://github.com/chorusfruit-233/ColorDuo/issues)
+[下载](https://github.com/chorusfruit-233/ColorDuo/releases) · [配置说明](docs/CONFIGURATION.md) · [更新记录](docs/CHANGELOG.md) · [问题反馈](https://github.com/chorusfruit-233/ColorDuo/issues)
 
 ## 功能
 
@@ -16,7 +16,7 @@
 
 需要 root 和支持 libxposed API 102 的 LSPosed。目前以一加 13 的 ColorOS 17 为参考适配。
 
-1. 下载构建产物，解压 ZIP 后安装 APK。
+1. 从 Releases 下载并安装 APK。
 2. 在 LSPosed 中启用 **ColorDuo**，作用域勾选 **系统界面（com.android.systemui）**。
 3. 重启 SystemUI 或手机，在绘图页添加所需组件。
 

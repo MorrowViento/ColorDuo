@@ -96,6 +96,9 @@ def package_apk(args):
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     owner = os.environ.get("GITHUB_REPOSITORY", "chorusfruit-233/ColorDuo").split("/")[0]
     prefix = github_prefix(owner)
+    namespace_matches = metadata["applicationId"].lower().startswith(prefix)
+    if args.variant == "release" and not namespace_matches:
+        raise ValueError(f"Release application ID must start with {prefix}")
     notes = release_notes(version) if args.variant == "release" else None
     out = args.output
     if out.exists() and any(out.iterdir()):
@@ -109,7 +112,7 @@ def package_apk(args):
     info = {**metadata, "variant": args.variant, "commit": commit, "apkSha256": digest,
             "signerSha256": cert, "xposed": xposed,
             "submission": {"expectedPrefix": prefix,
-                           "namespaceMatches": metadata["applicationId"].lower().startswith(prefix)}}
+                           "namespaceMatches": namespace_matches}}
     (out / "build-info.json").write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n")
     if notes is not None:
         (out / "CHANGELOG.md").write_text(notes)
