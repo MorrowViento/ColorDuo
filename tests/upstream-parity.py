@@ -28,7 +28,7 @@ def git(*args):
 
 
 def normalize(name, data):
-    # Permit only identity changes and hook dispatch/access. No rendering, defaults,
+    # Permit identity, hook dispatch/access and ROM input-unit normalization. No rendering, defaults,
     # layout, preview, signal-selection or settings-migration changes are permitted.
     if name == "Prefs.java":
         data = data.replace(b"io.github.chorusfruit233.colorduo.action.RELOAD",
@@ -48,6 +48,12 @@ def normalize(name, data):
         for signature in EXPOSED_HELPERS:
             data = data.replace(("    " + signature).encode(),
                                 ("    private " + signature).encode())
+    if name == "BatteryPresence.java":
+        data = data.replace(
+            b"            int current = currentNow(context);\n"
+            b"            // Normalize ROM input units before the shared upstream calculation.\n"
+            b"            if (ColorOsHooks.isInstalled()) current = ColorOsHooks.batteryCurrentMicroAmps(current, voltage);\n",
+            b"            final int current = currentNow(context);\n")
     return data
 
 

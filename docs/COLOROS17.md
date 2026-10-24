@@ -20,7 +20,9 @@
 | 电池状态 | `BatteryRepositoryImpl.getBatteryLevel/getChargeState/isSavingMode` 的 StateFlow |
 | 每个 View 的颜色 | `LocationBasedBatteryViewModel.getBatteryColor` 与 `StatBatteryIcon.getTintColor` |
 | Wi-Fi | `WifiIcon.Companion.fromModel` 的实时模型，仓库 StateFlow 和框架连接状态兜底 |
-| 分卡信号 | `OplusCellularIconViewModelImpl.getIcon/getNetworkTypeText/getSubscriptionId` |
+| 分卡信号 | `OplusCellularIconViewModelImpl` / `OplusMobileIconViewModel` 构造时捕获 backing StateFlow；getter 用于兼容没有内联调用的固件 |
+| 网络类型 | `Os17Binding.bindNetworkTypeText` 的实际模型；Interactor 原生映射用于提供可见性过滤前的制式文字 |
+| 充电功率 | `BatteryManager.CURRENT_NOW` 经参考固件单位归一化后，传给上游 `BatteryPresence` 的原有计算 |
 | 原生图标 | `StatusIconContainer.mIgnoredSlots`；仅撤销模块自己添加的 slot |
 
 模块只接管 `PhoneStatusBarView` 下的电池实例。原生 Drawable、尺寸、ScaleType 和子视图可见性在接管前保存；系统更新完成后重新记录。异常时恢复原生显示，不再接管该实例。
@@ -38,7 +40,7 @@
 - 环外视图直接使用上游的分卡/数据卡选择、堆叠绘制、功率温度格式、字体、字号、后缀缩放、间距、排序与空间分配函数。ColorOS 的 `system_icons` 是 LinearLayout，因此在原生电池旁挂载读数组，布局负责为它预留空间。
 - 原生时钟容器 `clock_for_fake` 的隐藏条件来自上游 `hidesStatusClock()`；模块关闭、布局交还时恢复原生可见性，系统更新同样纳入原生状态跟踪。
 
-`python3 tests/upstream-parity.py` 对比固定上游提交的 27 个共享源文件。只允许应用标识、配置刷新分发、启动器别名定位和现有辅助函数访问级别的差异；渲染、默认值、预览、选择规则与迁移逻辑存在差异即失败。CI 使用完整提交历史执行此检查。
+`python3 tests/upstream-parity.py` 对比固定上游提交的 27 个共享源文件。只允许应用标识、配置刷新分发、启动器别名定位、现有辅助函数访问级别，以及电流采样入口调用 ROM 单位适配的差异；功率公式、渲染、默认值、预览、选择规则与迁移逻辑存在差异即失败。CI 使用完整提交历史执行此检查。
 
 ## 第一轮真机验收
 
@@ -79,3 +81,23 @@
 删除 ColorOS 简化版环外绘制，复用上游原有函数；修正单卡在卡槽二、仅显示数据卡、信号尺寸和间距、功率/温度双行、网络类型字号与 A 后缀、自定义字体和环外排序的设置接线。原生百分比与时钟是否隐藏也交给上游条件判断。
 
 验证包含共享源码对比、配置传输、显式空布局、旧配置迁移、双卡独立放置、单卡/双卡/数据卡读数选择、实际绘图以及 alpha2 的 Wi-Fi 回归。覆盖安装 alpha3 后重启 SystemUI，在相同配置和信号条件下对照上游预览；实际双卡、RTL、胶囊和特殊动画仍需真机复测。
+
+## alpha4：网络类型与充电功率
+
+用户在 alpha3 上确认网络类型不显示、充电功率持续为 0。
+
+参考 DEX 中没有对 `OplusCellularIconViewModelImpl.getIcon/getNetworkTypeText` 的调用，原生调用已经内联。仅 Hook 这些 getter 无法获取模型。alpha4 同时观察 Cellular 和包装 ViewModel 的构造，直接记录卡号和 backing flow，并观察参考 DEX 中仍由初始化与 Flow collector 调用的 `Os17Binding.bindNetworkTypeText`。
+
+ColorOS 的网络类型值是 `OplusNetworkTypeTextModel`，含有具体文字模型的 prefix/suffix；alpha3 只接受 CharSequence，拿到模型后仍会丢弃。alpha4 使用原生映射合并前后缀，保留 `5GA`、`4G+` 等文字。原生 UI 可能因 Wi-Fi/数据状态过滤掉标签，适配器同时记录 Interactor 的原始映射，由上游配置决定 ColorDuo 是否显示。无服务、飞行模式和卡号切换会清理当前类型；模块接管类型时，仅跟踪并隐藏原生 `mobile_type_text/mobile_type_image`，交还系统时恢复。
+
+功率单位通过用户的两组只读数据确认：
+
+- `dumpsys battery` 报告电流 -285，电池电压 4465 mV，100% 电量、FULL 且 AC attached；`current_now` 节点读数 -221，`voltage_now` 为 4463000 µV。读数取得时间不同，电流会变化。
+- `IBatteryPropertiesRegistrar.getProperty(CURRENT_NOW)` 返回的 long 为 `fffffffffffffe10`，解码后是 -496；该固件在 Android 约定 µA 的接口里报告 mA。
+- -496 mA、4465 mV 对应 2.21464 W。alpha3 按 µA 计算成 0.00221464 W，上游格式化后为 `0.0W`。alpha4 在采样入口先乘 1000，再使用原有功率公式和格式化，得到 `2.2W`。
+
+单位配置严格限定本说明的已验证完整固件指纹。其他固件继续使用 Android 的 µA 约定，不根据电流大小猜测单位；未支持值和溢出保持 unknown，真实 0 仍为 0。功率仍表示电池侧瞬时读数；100% 时会随涓流和系统负载变化。
+
+`python3 tests/coloros-power.py` 提取并执行生产代码中的 `wattsOf`、`powerText`、`perfText`，覆盖实际 Binder 样本、单位误差复现、格式化、真实零、unknown、溢出、正负电流、充满但仍插电、拔电和温度双行。网络模型测试覆盖 backing field、接口 getter、原生图标映射、前后缀及空值。共享源码一致性检查保留，功率公式未修改。
+
+覆盖安装 alpha4 后重启 SystemUI，检查已有网络类型组件在 5G/4G 切换、Wi-Fi 切换和飞行模式下更新；插电时功率应随实际电流变化。日志首个 `ColorOS battery` 样本包含原始电流、单位、归一化电流和电压；开启调试日志可持续记录变化。未访问 root 命令或 sysfs 作为运行时数据源。

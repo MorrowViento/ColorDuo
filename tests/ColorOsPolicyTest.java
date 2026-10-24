@@ -14,6 +14,26 @@ public final class ColorOsPolicyTest {
         equal(-1, ColorOsPolicy.mobileLevel(-1, 5, true), "unknown strength");
         equal(-1, ColorOsPolicy.mobileLevel(0, 1, true), "unknown scale");
 
+        check(ColorOsPolicy.networkType(new NetworkTypeModel(new NetworkTypeText("5G", "A"))).equals("5GA"),
+                "ColorOS network model joins the native prefix and suffix");
+        check(ColorOsPolicy.networkType(new GetterNetworkModel()).equals("5GA"),
+                "interface-backed network models resolve through public getters");
+        check(ColorOsPolicy.networkType(new NetworkIconModel()).equals("5GA"),
+                "pre-visibility network identity uses the same native mapping");
+        check(ColorOsPolicy.networkType(new NetworkTypeModel(new NetworkTypeText("4G", "+"))).equals("4G+"),
+                "native carrier suffix is preserved");
+        check(ColorOsPolicy.networkType(new NetworkTypeModel(new NetworkTypeText("5G", null))).equals("5G"),
+                "missing suffix does not print null");
+        check(ColorOsPolicy.networkType("LTE").equals("LTE"), "plain text is accepted");
+        check(ColorOsPolicy.networkType(new NetworkTypeModel(null)).isEmpty(), "explicit native clearing is retained");
+        check(ColorOsPolicy.networkType(null).isEmpty(), "missing model clears the label");
+        check(ColorOsPolicy.networkType(new Object()).isEmpty(), "unknown models do not print a debug toString");
+        FieldOnlyMobile inlined = new FieldOnlyMobile();
+        check(ColorOsPolicy.nativeMember(inlined, "icon", "getIcon") == inlined.icon,
+                "constructor observation can read a flow without any getter call");
+        check(ColorOsPolicy.nativeMember(inlined, "networkTypeText", "getNetworkTypeText") == inlined.networkTypeText,
+                "inlined network type getter retains the backing flow");
+
         equal(3, ColorOsPolicy.wifiLevel(true, 3, null, -1, -1, false),
                 "connected Wi-Fi survives a cold Inactive repository (alpha1 regression)");
         equal(3, ColorOsPolicy.wifiLevel(true, 3, false, -1, -1, false),
@@ -58,7 +78,7 @@ public final class ColorOsPolicyTest {
         check(owner.sync(nativeSlots, Set.of()), "disable releases own wifi");
         check(nativeSlots.equals(Set.of("alarm_clock")), "disable retains unrelated system policy");
         check(!owner.sync(nativeSlots, Set.of()), "repeated disable is idempotent");
-        System.out.println("ColorOS Wi-Fi resolution, signal normalization and slot restoration passed");
+        System.out.println("ColorOS network models, Wi-Fi resolution, signal normalization and slot restoration passed");
     }
 
     private static void equal(int expected, int actual, String message) {
@@ -79,4 +99,27 @@ final class Unrelated$Active {
 }
 final class FieldOnlyActive {
     public final int level = 2;
+}
+final class NetworkTypeModel {
+    private final Object networkTypeText;
+    NetworkTypeModel(Object networkTypeText) { this.networkTypeText = networkTypeText; }
+}
+final class NetworkTypeText {
+    private final String prefix;
+    private final String suffix;
+    NetworkTypeText(String prefix, String suffix) { this.prefix = prefix; this.suffix = suffix; }
+}
+final class FieldOnlyMobile {
+    final Object icon = new Object();
+    final Object networkTypeText = new Object();
+}
+final class GetterNetworkModel {
+    public Object getNetworkTypeText() { return new GetterNetworkTypeText(); }
+}
+final class GetterNetworkTypeText {
+    public String getPrefix() { return "5G"; }
+    public String getSuffix() { return "A"; }
+}
+final class NetworkIconModel {
+    public Object getNetworkTypeTextModel() { return new GetterNetworkModel(); }
 }

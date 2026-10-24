@@ -130,7 +130,9 @@ final class BatteryPresence {
             final int whole = (temperature == Integer.MIN_VALUE)
                     ? TrioState.TEMP_UNKNOWN
                     : Math.round(temperature / 10f);
-            final int current = currentNow(context);
+            int current = currentNow(context);
+            // Normalize ROM input units before the shared upstream calculation.
+            if (ColorOsHooks.isInstalled()) current = ColorOsHooks.batteryCurrentMicroAmps(current, voltage);
             final float watts = wattsOf(current, voltage);
             publish(attached, watts, whole);
         } catch (RuntimeException ignored) {

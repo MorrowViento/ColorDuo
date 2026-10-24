@@ -2,13 +2,14 @@
 
 将状态栏的电池、Wi-Fi 和移动信号合并为一个三合一图标，基于 [HyperDuo](https://github.com/yixing233/HyperDuo) 移植。
 
-当前版本：`0.1.0-alpha3`。适配对象是一加 13（PJZ110）、ColorOS 17、Android 17，参考 SystemUI `17.99.02`。此版本已完成静态适配与构建验证，真机验证结果会记录在 [ColorOS 适配说明](docs/COLOROS17.md)。
+当前版本：`0.1.0-alpha4`。适配对象是一加 13（PJZ110）、ColorOS 17、Android 17，参考 SystemUI `17.99.02`。此版本已完成静态适配与构建验证，真机验证结果会记录在 [ColorOS 适配说明](docs/COLOROS17.md)。
 
 ## 当前实现
 
 - 独立的 ColorOS 电池视图适配，复用上游绘图和设置界面。
 - 从系统状态模型读取电量、颜色、普通充电和 VOOC 充电状态。
 - 读取 Wi-Fi、分卡信号与网络类型；将系统信号等级换算成四点显示。
+- 网络类型从原生模型的前缀、后缀取得；针对参考固件将电流从 mA 转为上游所需的 µA，功率继续使用电池电流乘电压。
 - 默认值、组件位置与优先级、双卡选择、预览示例完全沿用上游 `e9dffbc`，不添加移植版专属布局。
 - 环外堆叠信号、功率/温度格式、字体、字号和排序复用上游函数；ColorOS 适配器负责挂载原生视图。
 - 配置修改实时应用；关闭模块、组件交还系统或电池视图卸载时恢复对应原生显示。
@@ -38,6 +39,7 @@
 python3 tests/upstream-parity.py
 sh tests/coloros-policy.sh
 sh tests/coloros-settings.sh
+python3 tests/coloros-power.py
 ./gradlew :app:assembleDebug
 ```
 
