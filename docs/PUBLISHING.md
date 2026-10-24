@@ -45,12 +45,12 @@ Prepare release 只创建源码仓库的 Release 草稿，并附 APK 和校验�
 | 申请者与包名 | **匹配**：`chorusfruit-233` 经机器人规范化后是 `chorusfruit_233`；alpha6 起应用 ID 为 `io.github.chorusfruit_233.colorduo` |
 | Xposed APK 结构 | 具有 `META-INF/xposed/module.prop`、`java_init.list`、`scope.list`，API 102；模块仓支持这种现代格式 |
 | 模块介绍与摘要 | 已上传模块仓的 `README.md`、`SUMMARY`、`SOURCE_URL`；介绍中的链接使用源码仓库绝对地址 |
-| 可公开下载的版本 | [源码仓库](https://github.com/chorusfruit-233/ColorDuo/releases/tag/v0.1.0-alpha6) 与 [模块仓库](https://github.com/Xposed-Modules-Repo/io.github.chorusfruit_233.colorduo/releases/tag/10006-0.1.0-alpha6) 均已公开 `0.1.0-alpha6` / `10006`，实际下载核验 APK 完全相同 |
-| 发布签名 | 四项 secrets 已由 [发布构建](https://github.com/chorusfruit-233/ColorDuo/actions/runs/40091369875) 验证，实际 APK 签名检查通过。私有签名是本项目发布流程的要求，submission 机器人并未规定这一条件 |
+| 可公开下载的版本 | [源码仓库](https://github.com/chorusfruit-233/ColorDuo/releases/tag/v0.1.0) 与 [模块仓库](https://github.com/Xposed-Modules-Repo/io.github.chorusfruit_233.colorduo/releases/tag/10007-0.1.0) 均已公开 `0.1.0` / `10007`，均为 Latest 正式版，实际下载核验 APK 完全相同 |
+| 发布签名 | 四项 secrets 已由 [发布构建](https://github.com/chorusfruit-233/ColorDuo/actions/runs/40093925399) 验证，实际 APK 签名检查通过且与 alpha6 一致。私有签名是本项目发布流程的要求，submission 机器人并未规定这一条件 |
 | 模块仓申请与邀请 | [申请 #2285](https://github.com/Xposed-Modules-Repo/submission/issues/2285) 已自动批准，[模块仓](https://github.com/Xposed-Modules-Repo/io.github.chorusfruit_233.colorduo) 已建立，维护邀请已接受 |
 | 仓库显示资料 | 已通过网页设置 Description=`ColorDuo`、Website=`https://github.com/chorusfruit-233/ColorDuo/issues`，API 回读确认；[机器人要求通过网页设置](https://github.com/Xposed-Modules-Repo/submission/issues/2285#issuecomment-6383982871) |
 
-**自动审核、邀请接受、仓库资料和双仓签名 APK 发布均已完成，[最终发布流程](https://github.com/chorusfruit-233/ColorDuo/actions/runs/40092749062) 已通过。** 官网模块索引仍待同步。alpha6 使用新应用 ID 和发布签名，旧 alpha 配置不会自动迁移；具体升级步骤见 [配置说明](CONFIGURATION.md#升级与生效)。
+**`0.1.0` 双仓正式发布已完成，[发布流程](https://github.com/chorusfruit-233/ColorDuo/actions/runs/40094275765) 已通过，两个仓库原 alpha6 的预发布标记也已取消。** 从 alpha6 可覆盖升级并保留配置；更早版本的包名迁移步骤见 [配置说明](CONFIGURATION.md#升级与生效)。
 
 ## 申请与上架顺序
 
