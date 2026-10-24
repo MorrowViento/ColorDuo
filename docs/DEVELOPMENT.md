@@ -1,5 +1,7 @@
 # HyperDuo 开发文档
 
+> 上游历史资料：本文继承自 HyperDuo，内容对应原项目当时的环境与实现。ColorDuo 专注 ColorOS 17；当前说明见 [ColorDuo 文档索引](README.md) 和 [ColorOS 17 开发指南](COLOROS17-DEVELOPMENT.md)。
+
 面向二次开发与问题定位。用户向的安装、设置说明见 [README](../README.md)。
 
 2026-10-18 上中下改为「多选 + 优先级排序」：每处不再是一个槽位，而是一份**有序候选列表**。

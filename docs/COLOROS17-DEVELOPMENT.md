@@ -1,0 +1,94 @@
+# ColorDuo 开发指南
+
+本仓库由 chorusfruit-233 独立维护，开发目标是 **ColorOS 17**。当前参考一加 13 / PJZ110、Android 17、SystemUI 17.99.02。设备、固件和验收进展见 [适配记录](COLOROS17.md)。
+
+## 项目标识
+
+| 项目 | 当前值 |
+| --- | --- |
+| 应用名 | ColorDuo |
+| 仓库 | `chorusfruit-233/ColorDuo` |
+| 应用 ID | `io.github.chorusfruit233.colorduo` |
+| 源码 namespace | `io.github.yixing233.hyperduo`，沿用共享源码的命名 |
+| 测试版本 | `0.1.0-alpha4` / `10004` |
+| compileSdk / targetSdk / minSdk | 37 / 36 / 29 |
+| 框架 API | libxposed 102 |
+| 作用域 | `com.android.systemui` |
+
+源码 namespace 和保留的 MIUI Hook 属于继承代码；本项目的适配目标与测试范围为 ColorOS 17。SDK 构建参数不代表对其他 Android 或系统版本已经完成验证。
+
+## 构建
+
+准备完整 JDK 21、Android SDK Platform `37.0`、Build Tools `37.0.0`，并通过 `ANDROID_HOME` 或本机 `local.properties` 指定 SDK。仓库已提供 Gradle Wrapper 9.8.0。
+
+```sh
+./gradlew --no-daemon :app:assembleDebug
+```
+
+Windows 可使用 `gradlew.bat --no-daemon :app:assembleDebug`。首次构建需要联网下载依赖，`.tools/maven` 中保留了 libxposed 依赖。
+
+产物路径为 `app/build/outputs/apk/debug/app-debug.apk`。当前开发签名继承自原仓库，正式分发时应维护自己的签名，并保证后续覆盖升级的签名一致。
+
+版本可通过 `-PcolorduoVersionName=...` 和 `-PcolorduoVersionCode=...` 注入；旧的 `hyperduoVersionName/Code` 参数作为兼容别名保留。
+
+## 源码职责
+
+源码目录：[app/src/main/java/io/github/yixing233/hyperduo](../app/src/main/java/io/github/yixing233/hyperduo/)。
+
+| 文件 | 职责 |
+| --- | --- |
+| `HyperDuoModule.java` | 框架入口，选择系统适配器 |
+| `ColorOsHooks.java` | ColorOS 视图接管、原生更新跟踪、状态流捕获与恢复 |
+| `ColorOsPolicy.java` | 模型解析、信号换算、参考固件电流单位及 slot 所有权规则 |
+| `ColorOsReadings.java` | 在 ColorOS 原生布局中挂载环外读数组，复用共享绘制与排版函数 |
+| `BatteryPresence.java` / `WifiPresence.java` | 框架状态采样；电流在采样入口进行 ROM 单位适配 |
+| `Prefs.java` / `TrioSettings.java` / `TrioConfig.java` | 配置定义、传输和热更新 |
+| `TrioAppearance.java` / `TrioZones.java` / `TrioGeometry.java` / `TrioRenderer.java` | 共享外观、组件排序、几何与绘制 |
+| `TrioPreviewView.java` / `ui/` | 设置界面与模拟预览 |
+| `TrioHooks.java` / `GlyphDrawable.java` | 保留的 MIUI 接入及部分共享辅助函数 |
+
+主状态栏绘图由原生电池的 `battery_icon_view` 承载，独立 Canvas layer 限定共享渲染器的清屏范围。系统写入会更新原生快照，模块关闭或接管失败时使用该快照恢复。锁屏和快捷设置区域当前保持原生。
+
+网络类型应从 ColorOS 原生映射模型取值，按真实订阅与卡槽匹配。电流单位修正目前限定于已验证的完整固件指纹；扩展固件时，需要记录原始接口值和单位证据，保持 µA 输入、电压 mV 与共享功率公式一致。
+
+## 检查
+
+```sh
+python3 tests/upstream-parity.py
+sh tests/coloros-policy.sh
+sh tests/coloros-settings.sh
+python3 tests/coloros-power.py
+./gradlew --no-daemon :app:assembleDebug
+```
+
+这四组离线检查分别覆盖共享源码基线、ColorOS 原生模型与图标交接、配置与绘图，以及实际电流样本到功率格式化的路径。Python 检查需要 Python 3，Java 检查使用 JDK 21。`upstream-parity.py` 读取固定基线提交，CI 使用完整提交历史。
+
+共享规则当前继承自 HyperDuo `e9dffbcc8f65a5f3dc379c0b25ccdc0462a8a28d`。一致性检查允许独立应用标识、刷新分发、别名定位、辅助函数访问和采样单位适配，保护现有绘图、布局、迁移及功率公式。ColorOS 系统差异在适配层维护。
+
+`tests/` 中其他 PowerShell 脚本继承自上游，记录了不同时间的接口与环境。ColorDuo 当前检查入口为以上四项和 [CI 工作流](../.github/workflows/build.yml)。源码或构建检查通过后，仍需按 [真机验收项目](COLOROS17.md#第一轮真机验收) 记录目标固件表现。
+
+## 调试与反馈
+
+参考设备已确认官方 LSPosed 2.2.1（7933）以 API 102 加载模块。日志标识为 `ColorDuo`，可用下面的命令查看相关输出：
+
+```sh
+adb logcat -v time -s LSPosedFramework | rg 'ColorDuo|io\.github\.chorusfruit233\.colorduo'
+```
+
+设备信息应包含机型、完整固件指纹、SystemUI、Android、LSPosed 和模块版本。记录组件顺序、连接与充电状态，再与实际状态栏对照；预览使用固定示例数据。
+
+电池日志包含原始电流、单位、归一化电流与电压。网络日志包含模型捕获情况、数据卡槽、信号等级和制式文字。反馈入口是 [ColorDuo Issues](https://github.com/chorusfruit-233/ColorDuo/issues)。
+
+## 构建产物与分发
+
+[Build ColorDuo](../.github/workflows/build.yml) 在推送、PR 和手动触发时运行检查并构建测试 APK，上传 `ColorDuo-<version>` artifact。当前通过本仓库的 [Actions](https://github.com/chorusfruit-233/ColorDuo/actions/workflows/build.yml) 下载测试包，工作流不自动创建 Release。
+
+应用内更新地址指向 ColorDuo，仅接受 ColorDuo 命名的 APK。Actions artifact 与 GitHub Release 是不同分发入口；应用内更新依赖可用的 Release APK。
+
+`scripts/release.ps1` 和 `scripts/release-module.ps1` 继承自上游，仍包含 HyperDuo 的仓库、包名、模块仓及机器路径。它们作为历史工具保留；本仓库现行构建与测试分发使用 Gradle Wrapper 和上述 Actions 工作流。
+
+## 文档与来源
+
+用户配置见 [CONFIGURATION.md](CONFIGURATION.md)，本项目版本记录见 [CHANGELOG.md](CHANGELOG.md)。继承的 [HyperDuo 开发文档](DEVELOPMENT.md)、旧截图、发布说明和验证清单作为历史资料保留，其环境与结论需要与 ColorDuo 当前验证范围区分。
+
+共享代码保留 yixing233 与 HyperDuo 贡献者署名，ColorOS 17 适配由 ColorDuo 仓库维护，许可证为 [GPL-3.0-only](../LICENSE)。
