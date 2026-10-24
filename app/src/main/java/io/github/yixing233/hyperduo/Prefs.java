@@ -244,8 +244,6 @@ public final class Prefs {
      * cells it named, with the left column left empty.
      */
     public static final String EMPTY_LAYOUT = "||";
-    /** Charging/value, Wi-Fi, then SIM 1 with SIM 2 as the empty-slot fallback. */
-    public static final String DEFAULT_LAYOUT = "4,3|1|7,8";
 
     /**
      * Part ids. {@link #PART_NONE} never appears in a stored layout - an empty zone is an
@@ -1452,10 +1450,14 @@ public final class Prefs {
      * SIM, and the second row is an opt-in reading for a dual-SIM device.
      */
     public static final boolean DEF_DUAL_SIM = false;
-    /** Enabled for the default per-card layout; placement still decides what is drawn. */
-    public static final boolean DEF_SHOW_SIM_1 = true;
-    /** Allows the default priority list to use SIM 2 when SIM 1 is absent. */
-    public static final boolean DEF_SHOW_SIM_2 = true;
+    /**
+     * Off by default: the per-card rows are an opt-in reading. With both off, the
+     * aggregate meter draws exactly what it always drew, so an install that never
+     * opens these switches sees no change at all.
+     */
+    public static final boolean DEF_SHOW_SIM_1 = false;
+    /** Off by default; see {@link #DEF_SHOW_SIM_1}. */
+    public static final boolean DEF_SHOW_SIM_2 = false;
 
     public static final boolean DEF_ROLE_COLORS = true;
     public static final int DEF_COLOR_CRITICAL_ON_DARK = 0xFFFF3B30;

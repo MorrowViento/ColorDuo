@@ -83,7 +83,7 @@ public final class TrioSettings {
      * <p>Stored as the string {@link Prefs#KEY_RING_LAYOUT}; this is its decoded form.
      * Never null: every entry is a non-null array, possibly empty.
      */
-    public int[][] ringZones = Prefs.decodeLayout(Prefs.DEFAULT_LAYOUT);
+    public int[][] ringZones = Prefs.decodeLayout(Prefs.EMPTY_LAYOUT);
 
     /**
      * Draws one row of level dots per SIM - SIM 1 on top, SIM 2 below - instead
@@ -642,10 +642,6 @@ public final class TrioSettings {
         if (style == Prefs.STYLE_CAPSULE && p.contains(Prefs.KEY_RING_LAYOUT)) {
             return p.getString(Prefs.KEY_RING_LAYOUT, Prefs.EMPTY_LAYOUT);
         }
-        if (!p.contains(Prefs.KEY_RING_SLOTS_V2)
-                && !p.contains(Prefs.KEY_RING_SLOTS)) {
-            return Prefs.DEFAULT_LAYOUT;
-        }
         return Prefs.migrateLayout(
                 packedAsString(p, Prefs.KEY_RING_SLOTS_V2),
                 packedAsString(p, Prefs.KEY_RING_SLOTS));
@@ -659,10 +655,6 @@ public final class TrioSettings {
         }
         if (style == Prefs.STYLE_CAPSULE && bundle.containsKey(Prefs.KEY_RING_LAYOUT)) {
             return bundle.getString(Prefs.KEY_RING_LAYOUT, Prefs.EMPTY_LAYOUT);
-        }
-        if (!bundle.containsKey(Prefs.KEY_RING_SLOTS_V2)
-                && !bundle.containsKey(Prefs.KEY_RING_SLOTS)) {
-            return Prefs.DEFAULT_LAYOUT;
         }
         return Prefs.migrateLayout(
                 packedAsString(bundle, Prefs.KEY_RING_SLOTS_V2),

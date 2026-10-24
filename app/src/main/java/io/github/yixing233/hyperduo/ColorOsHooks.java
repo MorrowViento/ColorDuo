@@ -389,7 +389,8 @@ final class ColorOsHooks {
         long nextSignalSample;
         String lastWifiNote;
         String lastWifiHandoff;
-        View extra;
+        ColorOsReadings extra;
+        View clockContainer;
 
         Host(ViewGroup meter) {
             this.meter = meter;
@@ -420,6 +421,17 @@ final class ColorOsHooks {
                     nativeVisibility.put(child, child.getVisibility());
                     CHILDREN.put(child, new WeakReference<>(this));
                 }
+            }
+            clockContainer = null;
+            int clockId = meter.getResources().getIdentifier("clock_for_fake", "id", "com.android.systemui");
+            for (ViewParent p = meter.getParent(); p instanceof View; p = p.getParent()) {
+                if (!phoneBarClass.isInstance(p)) continue;
+                clockContainer = ((View) p).findViewById(clockId);
+                if (clockContainer != null) {
+                    nativeVisibility.put(clockContainer, clockContainer.getVisibility());
+                    CHILDREN.put(clockContainer, new WeakReference<>(this));
+                }
+                break;
             }
         }
 
@@ -473,8 +485,10 @@ final class ColorOsHooks {
             visibilityOverrides.put(image, View.VISIBLE);
             image.setVisibility(View.VISIBLE);
             hide("battery_content", true);
-            hide("battery_percentage_view", appearance.ownsValue());
+            hide("battery_percentage_view", !appearance.handsBackPercentage());
             hide("battery_charge_icon", appearance.hidesNativeBolt());
+            hide(clockContainer, appearance.hidesStatusClock()
+                    && TrioState.sClockText != null && !TrioState.sClockText.isEmpty());
             syncExtra(appearance);
             syncSlots(appearance);
             glyph.invalidateSelf();
@@ -487,7 +501,10 @@ final class ColorOsHooks {
         }
 
         void hide(String name, boolean hidden) {
-            View view = find(name);
+            hide(find(name), hidden);
+        }
+
+        void hide(View view, boolean hidden) {
             Integer original = nativeVisibility.get(view);
             if (view != null && original != null) {
                 if (hidden) visibilityOverrides.put(view, View.GONE);
@@ -674,12 +691,14 @@ final class ColorOsHooks {
 
         void syncExtra(TrioAppearance appearance) {
             if (extra == null) {
-                Readings readings = new Readings(this);
-                meter.addView(readings, 0, new LinearLayout.LayoutParams(
+                ViewParent parent = meter.getParent();
+                if (!(parent instanceof LinearLayout)) return;
+                LinearLayout row = (LinearLayout) parent;
+                extra = new ColorOsReadings(meter.getContext(), state, image);
+                row.addView(extra, row.indexOfChild(meter), new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
-                extra = readings;
             }
-            ((Readings) extra).update(appearance);
+            extra.update(appearance);
         }
 
         @Override public void onViewAttachedToWindow(View view) {
@@ -688,6 +707,10 @@ final class ColorOsHooks {
         @Override public void onViewDetachedFromWindow(View view) {
             restore();
             iconContainer = null;
+            if (extra != null && extra.getParent() instanceof ViewGroup) {
+                ((ViewGroup) extra.getParent()).removeView(extra);
+                extra = null;
+            }
         }
     }
 
@@ -720,71 +743,4 @@ final class ColorOsHooks {
         @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
     }
 
-    /** Extra readings live inside the existing battery row and follow its visibility/animations. */
-    private static final class Readings extends View {
-        final Host host;
-        final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        String text = "";
-        boolean signal;
-        float signalWidth;
-        float gap;
-        float textWidth;
-
-        Readings(Host host) { super(host.meter.getContext()); this.host = host; }
-
-        void update(TrioAppearance appearance) {
-            signal = appearance.stackedOut();
-            float density = getResources().getDisplayMetrics().density;
-            paint.setTextSize(10 * density * appearance.perfFit());
-            paint.setTypeface(android.graphics.Typeface.create(
-                    android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL),
-                    appearance.perfTypeWeight(), false));
-            gap = 3 * density;
-            signalWidth = signal ? appearance.outSignalSize * density : 0;
-            StringBuilder value = new StringBuilder();
-            if (appearance.typeOutOfRing && !host.state.mobileType.isEmpty()) value.append(host.state.mobileType);
-            if (appearance.perfPower && TrioState.sChargingAttached && !Float.isNaN(TrioState.sChargePowerW)) {
-                if (value.length() > 0) value.append(' ');
-                value.append(String.format(java.util.Locale.ROOT, "%.1fW", TrioState.sChargePowerW));
-            }
-            if (appearance.perfTemp && (!appearance.perfTempChargingOnly || TrioState.sChargingAttached)
-                    && TrioState.sBatteryTempC != TrioState.TEMP_UNKNOWN) {
-                if (value.length() > 0) value.append(' ');
-                value.append(TrioState.sBatteryTempC).append('°');
-            }
-            text = value.toString();
-            textWidth = paint.measureText(text);
-            setVisibility(signal || !text.isEmpty() ? VISIBLE : GONE);
-            int width = Math.round(signalWidth + textWidth + (signalWidth > 0 && textWidth > 0 ? gap : 0) + gap);
-            if (getLayoutParams().width != width) {
-                getLayoutParams().width = width;
-                requestLayout();
-            }
-            invalidate();
-        }
-
-        @Override protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            int color = host.state.foreground();
-            paint.setColor(color);
-            if (signal) {
-                float base = getHeight() * 0.65f;
-                float step = signalWidth / 4;
-                int main = host.state.slotLevels[0];
-                for (int i = 0; i < 4; i++) {
-                    paint.setAlpha(main > i ? 255 : 70);
-                    float height = getHeight() * (0.17f + i * 0.10f);
-                    canvas.drawRoundRect(i * step, base - height, i * step + step * 0.65f,
-                            base, step * 0.25f, step * 0.25f, paint);
-                    if (host.state.slotLevels[1] >= 0) {
-                        paint.setAlpha(host.state.slotLevels[1] > i ? 255 : 70);
-                        canvas.drawCircle(i * step + step * 0.32f, base + step * 0.6f, step * 0.24f, paint);
-                    }
-                }
-            }
-            paint.setAlpha(255);
-            canvas.drawText(text, signalWidth + (signal && !text.isEmpty() ? gap : 0),
-                    (getHeight() - paint.ascent() - paint.descent()) / 2, paint);
-        }
-    }
 }

@@ -10,13 +10,10 @@ import java.util.Arrays;
 public final class ColorOsSettingsTest {
     public static void main(String[] args) {
         TrioSettings fresh = TrioSettings.defaults();
-        check(Arrays.equals(fresh.ringZones[0], new int[] {Prefs.PART_BOLT, Prefs.PART_VALUE}),
-                "charging falls back to percentage");
-        check(Arrays.equals(fresh.ringZones[1], new int[] {Prefs.PART_WIFI}), "Wi-Fi placed");
-        check(Arrays.equals(fresh.ringZones[2], new int[] {Prefs.PART_SIM_1, Prefs.PART_SIM_2}),
-                "SIM 1 falls back to SIM 2");
-        check(TrioAppearance.of(fresh).foldsMobile(), "fresh defaults actually draw signal");
-        check(TrioAppearance.of(fresh).ownsWifi(), "fresh defaults draw Wi-Fi");
+        for (int[] zone : fresh.ringZones) check(zone.length == 0, "upstream starts with empty component zones");
+        check(!fresh.showSim1 && !fresh.showSim2, "per-card rows are opt-in upstream");
+        check(!TrioAppearance.of(fresh).foldsMobile(), "unplaced signal remains native");
+        check(!TrioAppearance.of(fresh).ownsWifi(), "unplaced Wi-Fi remains native");
         check(TrioSettings.fromBundle(fresh.toBundle()).equals(fresh), "full settings transport");
         check(Arrays.deepEquals(TrioSettings.fromBundle(new Bundle()).ringZones, fresh.ringZones),
                 "first connection without stored settings uses the same layout");
@@ -34,20 +31,39 @@ public final class ColorOsSettingsTest {
         legacy.putInt(Prefs.KEY_RING_SLOTS_V2, Prefs.packRingParts(Prefs.PART_VALUE, Prefs.PART_WIFI, Prefs.PART_SIM_1));
         TrioSettings migrated = TrioSettings.fromBundle(legacy);
         check(Arrays.equals(migrated.ringZones[0], new int[] {Prefs.PART_VALUE}),
-                "existing packed layouts take precedence over new-install defaults");
+                "existing packed layouts retain upstream migration");
+
+        TrioSettings dual = fresh.copy();
+        dual.showSim1 = true;
+        dual.showSim2 = true;
+        dual.ringZones = Prefs.decodeLayout("7|1|8");
+        TrioAppearance.Ring layout = TrioAppearance.of(dual).ring(65, false, 3, "5G", 2);
+        check(layout.parts[0] == Prefs.PART_SIM_1 && layout.parts[2] == Prefs.PART_SIM_2,
+                "separately placed cards display simultaneously");
+        check(Arrays.deepEquals(TrioSettings.fromBundle(dual.toBundle()).ringZones, dual.ringZones),
+                "explicit dual-card placement is preserved");
+        int[] reading = new int[2];
+        TrioRenderer.outSignalLevels(false, 4, new int[] {4, -1}, 0, reading);
+        check(Arrays.equals(reading, new int[] {4, -1}), "single SIM uses one full reading");
+        TrioRenderer.outSignalLevels(false, 2, new int[] {-1, 2}, 1, reading);
+        check(Arrays.equals(reading, new int[] {2, -1}), "a lone SIM in slot 2 is not duplicated");
+        TrioRenderer.outSignalLevels(false, 4, new int[] {4, 2}, 0, reading);
+        check(Arrays.equals(reading, new int[] {4, 2}), "dual readings retain each card's level");
+        TrioRenderer.outSignalLevels(true, 2, new int[] {4, 2}, 1, reading);
+        check(Arrays.equals(reading, new int[] {2, -1}), "data-SIM-only selects the actual data slot");
 
         BufferedImage image = new BufferedImage(240, 200, BufferedImage.TYPE_INT_ARGB);
         Graphics2D graphics = image.createGraphics();
         try {
             TrioRenderer.drawInto(new Canvas(graphics), 240, 200, 65, false, false,
-                    false, false, 4, 4, new int[] {4, -1}, "5G", 0xFFFFFFFF, fresh, true, true);
+                    false, false, 4, 4, new int[] {4, 2}, "5G", 0xFFFFFFFF, dual, true, true);
         } finally { graphics.dispose(); }
         int ink = 0;
         for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) {
             if ((image.getRGB(x, y) >>> 24) != 0) ink++;
         }
-        check(ink > 1000, "new-install ring paints visible artwork");
-        System.out.println("ColorOS defaults, settings transport, ownership and ring rendering passed");
+        check(ink > 1000, "configured upstream dual-card ring paints visible artwork");
+        System.out.println("Upstream defaults, settings transport, dual-card selection and ring rendering passed");
     }
 
     private static void check(boolean value, String message) {
