@@ -1956,7 +1956,7 @@ private fun InfoCard(service: XposedService?) {
  */
 private fun isLauncherIconHidden(context: android.content.Context): Boolean {
     val component = android.content.ComponentName(context.packageName,
-            context.packageName + ".ui.MainActivityAlias")
+            MainActivity::class.java.name + "Alias")
     return try {
         val state = context.packageManager.getComponentEnabledSetting(component)
         state == android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED
@@ -1975,7 +1975,7 @@ private fun isLauncherIconHidden(context: android.content.Context): Boolean {
  */
 private fun setLauncherIconHidden(context: android.content.Context, hidden: Boolean) {
     val component = android.content.ComponentName(context.packageName,
-            context.packageName + ".ui.MainActivityAlias")
+            MainActivity::class.java.name + "Alias")
     val state = if (hidden) {
         android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED
     } else {

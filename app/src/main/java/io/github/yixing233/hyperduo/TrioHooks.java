@@ -88,7 +88,7 @@ import io.github.libxposed.api.XposedModule;
  */
 final class TrioHooks {
 
-    private static final String TAG = "HyperDuo";
+    private static final String TAG = "ColorDuo";
     private static final Map<View, Boolean> KEYGUARD_ROWS = new WeakHashMap<>();
     private static final Map<Object, List<String>> KEYGUARD_ADDED = new WeakHashMap<>();
     static final int LOG_INFO = 4;
@@ -116,6 +116,8 @@ final class TrioHooks {
 
     /** Module handle for logging from helpers that have no callback argument. */
     private static volatile XposedModule sModule;
+
+    static void useLogger(XposedModule module) { sModule = module; }
 
     /**
      * Every slot the module knows how to fold, one group per sub-toggle.
@@ -3056,6 +3058,10 @@ final class TrioHooks {
 
     /** Repaints every trio host. Signal updates arrive off the UI thread. */
     static void invalidateHosts() {
+        if (ColorOsHooks.isInstalled()) {
+            ColorOsHooks.invalidateHosts();
+            return;
+        }
         // The bar itself is asked to lay out again as well: the host can have
         // left the tree since the last pass, and MIUI re-derives the width it
         // gives the row, so the readings have to be measured against the new
