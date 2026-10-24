@@ -1,0 +1,108 @@
+name: Prepare release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version name with an entry in docs/CHANGELOG.md
+        required: true
+        type: string
+      version_code:
+        description: Android versionCode (increase for each release)
+        required: true
+        type: number
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+
+  release:
+    name: Signed APK and release draft
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      VERSION_NAME: ${{ inputs.version }}
+      VERSION_CODE: ${{ inputs.version_code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate version and changelog
+        run: >-
+          python3 scripts/ci/artifacts.py plan
+          --version "$VERSION_NAME" --version-code "$VERSION_CODE"
+      - name: Restore signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.COLORDUO_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.COLORDUO_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.COLORDUO_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.COLORDUO_KEY_PASSWORD }}
+        run: |
+          python3 - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+
+          required = ('KEYSTORE_BASE64', 'KEYSTORE_PASSWORD', 'KEY_ALIAS', 'KEY_PASSWORD')
+          missing = [key for key in required if not os.environ.get(key)]
+          if missing:
+              raise SystemExit('Missing signing secrets: ' + ', '.join(missing))
+          key = Path(os.environ['RUNNER_TEMP']) / 'colorduo-release.keystore'
+          key.write_bytes(base64.b64decode(os.environ['KEYSTORE_BASE64'], validate=True))
+          key.chmod(0o600)
+          with open(os.environ['GITHUB_ENV'], 'a') as out:
+              out.write(f'COLORDUO_KEYSTORE_PATH={key}\n')
+          PY
+      - uses: ./.github/actions/android
+      - name: Build signed release
+        env:
+          COLORDUO_KEYSTORE_PASSWORD: ${{ secrets.COLORDUO_KEYSTORE_PASSWORD }}
+          COLORDUO_KEY_ALIAS: ${{ secrets.COLORDUO_KEY_ALIAS }}
+          COLORDUO_KEY_PASSWORD: ${{ secrets.COLORDUO_KEY_PASSWORD }}
+        run: >-
+          ./gradlew --no-daemon :app:assembleRelease
+          "-PcolorduoVersionName=$VERSION_NAME"
+          "-PcolorduoVersionCode=$VERSION_CODE"
+      - name: Verify and package
+        id: package
+        run: >-
+          python3 scripts/ci/artifacts.py package --variant release
+          --version "$VERSION_NAME" --version-code "$VERSION_CODE"
+      - name: Upload release bundle
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.package.outputs.artifact_name }}
+          path: dist/
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
+      - name: Create release draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=()
+          if [[ "$VERSION_NAME" == *-* ]]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "v$VERSION_NAME" dist/*.apk dist/SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "$VERSION_NAME" --notes-file dist/CHANGELOG.md \
+            --draft "${flags[@]}"
+      - name: Remove signing key
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          (Path(os.environ['RUNNER_TEMP']) / 'colorduo-release.keystore').unlink(missing_ok=True)
+          PY

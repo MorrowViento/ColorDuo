@@ -9,11 +9,12 @@ ColorDuo 是完全由 Codex 维护的 HyperDuo fork，当前专注 **ColorOS 17*
 | [项目首页](../README.md) | 定位、适配范围、安装、下载和问题反馈 |
 | [配置说明](CONFIGURATION.md) | 组件优先顺序、双卡、无 Wi-Fi 切换、预览与环外读数 |
 | [ColorOS 17 开发指南](COLOROS17-DEVELOPMENT.md) | 本仓库构建、源码职责、检查和分发 |
+| [构建与模块仓发布](PUBLISHING.md) | 工作流、签名、Release 草稿和上架条件 |
 | [适配与验证记录](COLOROS17.md) | 参考固件、SystemUI 接入、单位适配、已知边界与真机验收 |
 | [更新记录](CHANGELOG.md) | ColorDuo 自身的版本记录 |
 | [模块简介](../module-README.md) | ColorDuo 的精简介绍 |
 
-下载、构建和问题跟踪使用 [ColorDuo 仓库](https://github.com/chorusfruit-233/ColorDuo)。当前测试 APK 由 [GitHub Actions](https://github.com/chorusfruit-233/ColorDuo/actions/workflows/build.yml) 产出，工作流只上传构建产物。
+下载、构建和问题跟踪使用 [ColorDuo 仓库](https://github.com/chorusfruit-233/ColorDuo)。测试 APK 由 [Build ColorDuo](https://github.com/chorusfruit-233/ColorDuo/actions/workflows/build.yml) 产出；发布准备流程见 [构建与模块仓发布](PUBLISHING.md)。
 
 ## 上游历史资料
 

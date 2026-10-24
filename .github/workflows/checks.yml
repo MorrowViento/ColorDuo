@@ -1,0 +1,34 @@
+name: Checks
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Regression checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Upstream behavior parity
+        run: python3 tests/upstream-parity.py
+      - name: ColorOS ownership and signals
+        run: sh tests/coloros-policy.sh
+      - name: Ring rendering and settings
+        run: sh tests/coloros-settings.sh
+      - name: Battery units and power rendering
+        run: python3 tests/coloros-power.py
+      - name: Main, keyguard and shade hosts
+        run: python3 tests/coloros-hosts.py
+      - name: Publication metadata
+        run: python3 tests/release-artifacts.py

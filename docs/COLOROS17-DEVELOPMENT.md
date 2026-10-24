@@ -27,7 +27,7 @@
 
 Windows 可使用 `gradlew.bat --no-daemon :app:assembleDebug`。首次构建需要联网下载依赖，`.tools/maven` 中保留了 libxposed 依赖。
 
-产物路径为 `app/build/outputs/apk/debug/app-debug.apk`。当前开发签名继承自原仓库，正式分发时应维护自己的签名，并保证后续覆盖升级的签名一致。
+产物路径为 `app/build/outputs/apk/debug/app-debug.apk`。debug 沿用开发签名；release 通过 `COLORDUO_KEYSTORE_PATH`、`COLORDUO_KEYSTORE_PASSWORD`、`COLORDUO_KEY_ALIAS`、`COLORDUO_KEY_PASSWORD` 环境变量接入私有签名，缺少签名配置时产出未签名 APK。发布配置见 [构建与模块仓发布](PUBLISHING.md)。
 
 版本可通过 `-PcolorduoVersionName=...` 和 `-PcolorduoVersionCode=...` 注入；旧的 `hyperduoVersionName/Code` 参数作为兼容别名保留。
 
@@ -62,10 +62,11 @@ sh tests/coloros-policy.sh
 sh tests/coloros-settings.sh
 python3 tests/coloros-power.py
 python3 tests/coloros-hosts.py
+python3 tests/release-artifacts.py
 ./gradlew --no-daemon :app:assembleDebug
 ```
 
-这五组离线检查覆盖共享源码基线、ColorOS 原生模型与图标交接、配置与绘图、实际电流样本到功率格式化，以及多页面电池接管和恢复。跨页面检查执行生产 Host 的接管、恢复与读数挂载方法，并检查独立行及视图迁移；不模拟真实 GPU、SystemUI 动画或 ROM 生命周期。Python 检查需要 Python 3，Java 检查使用 JDK 21。`upstream-parity.py` 读取固定基线提交，CI 使用完整提交历史。
+前五组离线检查覆盖共享源码基线、ColorOS 原生模型与图标交接、配置与绘图、实际电流样本到功率格式化，以及多页面电池接管和恢复。跨页面检查执行生产 Host 的接管、恢复与读数挂载方法，并检查独立行及视图迁移；不模拟真实 GPU、SystemUI 动画或 ROM 生命周期。发布元数据检查另行覆盖版本输入、更新记录、模块入口、签名拒绝及用户名规范化。Python 检查需要 Python 3，Java 检查使用 JDK 21。`upstream-parity.py` 读取固定基线提交，CI 使用完整提交历史。
 
 共享规则当前继承自 HyperDuo `e9dffbcc8f65a5f3dc379c0b25ccdc0462a8a28d`。一致性检查允许独立应用标识、刷新分发、别名定位、辅助函数访问和采样单位适配，保护现有绘图、布局、迁移及功率公式。ColorOS 系统差异在适配层维护。
 
@@ -85,11 +86,13 @@ adb logcat -v time -s LSPosedFramework | rg 'ColorDuo|io\.github\.chorusfruit233
 
 ## 构建产物与分发
 
-[Build ColorDuo](../.github/workflows/build.yml) 在推送、PR 和手动触发时运行检查并构建测试 APK，上传 `ColorDuo-<version>` artifact。当前通过本仓库的 [Actions](https://github.com/chorusfruit-233/ColorDuo/actions/workflows/build.yml) 下载测试包，工作流不自动创建 Release。
+[Build ColorDuo](../.github/workflows/build.yml) 在 main 代码推送、PR 和手动触发时运行共用检查，再构建测试 APK，上传 `ColorDuo-<version>-debug-<commit>` artifact；文档修改不触发构建。产物打包步骤读取 APK 的实际版本，校验签名、现代 Xposed 入口及作用域，并附校验文件和构建信息。
 
-应用内更新地址指向 ColorDuo，仅接受 ColorDuo 命名的 APK。Actions artifact 与 GitHub Release 是不同分发入口；应用内更新依赖可用的 Release APK。
+[Prepare release](../.github/workflows/release.yml) 手动构建私有签名的 release APK，通过版本、更新记录、签名和模块结构校验后创建 Release 草稿。具体 secrets、模块仓素材及当前包名审核阻碍见 [构建与模块仓发布](PUBLISHING.md)。
 
-`scripts/release.ps1` 和 `scripts/release-module.ps1` 继承自上游，仍包含 HyperDuo 的仓库、包名、模块仓及机器路径。它们作为历史工具保留；本仓库现行构建与测试分发使用 Gradle Wrapper 和上述 Actions 工作流。
+应用内更新地址指向 ColorDuo，仅接受 ColorDuo 命名的 APK。Actions artifact 与 GitHub Release 是不同分发入口；应用内更新依赖可用的稳定 Release APK。
+
+`scripts/release.ps1` 和 `scripts/release-module.ps1` 继承自上游，仍包含 HyperDuo 的仓库、包名、模块仓及机器路径。它们作为历史工具保留；本仓库现行构建与分发使用 Gradle Wrapper 和上述 Actions 工作流。
 
 ## 文档与来源
 

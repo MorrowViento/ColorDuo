@@ -7,12 +7,10 @@ plugins {
 // Keep the old property aliases for upstream build scripts.
 val tagVersionName = ((findProperty("colorduoVersionName") ?: findProperty("hyperduoVersionName")) as String?)?.takeIf { it.isNotBlank() }
 val tagVersionCode = ((findProperty("colorduoVersionCode") ?: findProperty("hyperduoVersionCode")) as String?)?.toIntOrNull()
+val releaseKeystorePath = providers.environmentVariable("COLORDUO_KEYSTORE_PATH").orNull
 
 android {
-    // io.github.* because LSPosed's module repo verifies a reverse-domain id
-    // against a DNS TXT record for the root domain: hyperduo.com is registered
-    // by someone else, so anything under it would fail the check. The
-    // io.github.<user> form needs no domain and no TXT record.
+    // Retain the source namespace so shared upstream code can be merged.
     namespace = "io.github.yixing233.hyperduo"
     compileSdk = 37
     buildToolsVersion = "37.0.0"
@@ -27,20 +25,27 @@ android {
     }
 
     signingConfigs {
-        // Inherited development key for reproducible test APKs. Configure a private
-        // publishing key before distributing production releases.
-        create("hyperduo") {
+        // Keep installed alpha test builds upgradeable with the development key.
+        create("development") {
             storeFile = rootProject.file(".tools/debug.keystore")
             storePassword = "android"
             keyAlias = "hyperduo"
             keyPassword = "android"
+        }
+        if (releaseKeystorePath != null) {
+            create("publication") {
+                storeFile = file(releaseKeystorePath)
+                storePassword = providers.environmentVariable("COLORDUO_KEYSTORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("COLORDUO_KEY_ALIAS").get()
+                keyPassword = providers.environmentVariable("COLORDUO_KEY_PASSWORD").get()
+            }
         }
     }
 
     buildTypes {
         debug {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("hyperduo")
+            signingConfig = signingConfigs.getByName("development")
         }
         release {
             isMinifyEnabled = true
@@ -49,7 +54,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            signingConfig = signingConfigs.getByName("hyperduo")
+            // Missing private credentials produce an unsigned APK, never a
+            // public-development-key release. The release workflow requires them.
+            signingConfig = signingConfigs.findByName("publication")
         }
     }
 

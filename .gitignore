@@ -3,7 +3,7 @@
 # Only the two pieces a fresh clone actually needs to build are tracked:
 #   .tools/maven/        vendored io.github.libxposed:*:102.0.0 artifacts,
 #                        referenced first in settings.gradle.kts so --offline works
-#   .tools/debug.keystore  the signing key app/build.gradle.kts points at
+#   .tools/debug.keystore  the inherited debug-only signing key
 # ---------------------------------------------------------------------------
 /.tools/*
 !/.tools/maven
@@ -33,6 +33,12 @@
 
 # Machine-specific SDK path
 local.properties
+
+# Private publication keys; retain only the inherited public development key.
+*.keystore
+*.jks
+*.p12
+!/.tools/debug.keystore
 
 # IDE
 .idea/
