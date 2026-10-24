@@ -71,7 +71,7 @@ python3 tests/module-publish.py
 
 共享规则当前继承自 HyperDuo `e9dffbcc8f65a5f3dc379c0b25ccdc0462a8a28d`。一致性检查允许独立应用标识、刷新分发、别名定位、辅助函数访问和采样单位适配，保护现有绘图、布局、迁移及功率公式。ColorOS 系统差异在适配层维护。
 
-`tests/` 中其他 PowerShell 脚本继承自上游，记录了不同时间的接口与环境。ColorDuo 当前检查入口为以上五项和 [CI 工作流](../.github/workflows/build.yml)。源码或构建检查通过后，仍需按 [真机验收项目](COLOROS17.md#第一轮真机验收) 记录目标固件表现。
+`tests/` 中其他 PowerShell 脚本继承自上游，记录了不同时间的接口与环境。ColorDuo 当前检查入口为以上检查和 [CI 工作流](../.github/workflows/build.yml)。源码或构建检查通过后，仍需按 [真机验收项目](COLOROS17.md#第一轮真机验收) 记录目标固件表现。
 
 ## 调试与反馈
 
