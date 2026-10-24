@@ -20,6 +20,7 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
 import android.net.wifi.WifiInfo;
+import android.net.wifi.SupplicantState;
 import android.os.Handler;
 import android.os.Looper;
 import android.net.wifi.WifiManager;
@@ -39,6 +40,9 @@ final class WifiPresence {
         final Boolean live = connected;
         return live != null ? live.booleanValue() : iconVisible || cachedLevel >= 0;
     }
+
+    /** Last definitive framework observation; null means the query has not answered. */
+    static Boolean connectedSnapshot() { return connected; }
 
     static synchronized void start(final Context context) {
         if (!watchdogStarted) {
@@ -121,22 +125,52 @@ final class WifiPresence {
                 publish(false);
                 return;
             }
-            final ConnectivityManager connectivity =
-                    context.getSystemService(ConnectivityManager.class);
-            // TYPE_WIFI observes Wi-Fi even when mobile/VPN is the default route.
-            final NetworkInfo network = connectivity == null ? null
-                    : connectivity.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
-            if (enabled && connectivity == null) return;
-            final boolean next = enabled && network != null && network.isConnected();
+            WifiInfo info = null;
+            try { info = wifi.getConnectionInfo(); }
+            catch (RuntimeException ignored) { /* try NetworkCapabilities below */ }
+            final ConnectivityManager connectivity = context.getSystemService(ConnectivityManager.class);
+            boolean wifiNetwork = false;
+            boolean networksKnown = false;
+            if (connectivity != null) {
+                try {
+                    // Inspect Wi-Fi independently of the default route, which may be mobile or VPN.
+                    for (Network network : connectivity.getAllNetworks()) {
+                        NetworkCapabilities capabilities = connectivity.getNetworkCapabilities(network);
+                        if (capabilities == null || !capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+                                || capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) continue;
+                        wifiNetwork = true;
+                        if (capabilities.getTransportInfo() instanceof WifiInfo) {
+                            info = (WifiInfo) capabilities.getTransportInfo();
+                        }
+                        break;
+                    }
+                    networksKnown = true;
+                } catch (RuntimeException ignored) { /* legacy and association fallbacks remain */ }
+            }
+            Boolean next = null;
+            if (wifiNetwork || (info != null && info.getSupplicantState() == SupplicantState.COMPLETED)) {
+                next = Boolean.TRUE;
+            } else {
+                // Android 17 may not provide a legacy TYPE_WIFI NetworkInfo. A null legacy
+                // object is not by itself evidence that a connected Wi-Fi network disappeared.
+                NetworkInfo legacy = null;
+                try {
+                    if (connectivity != null) legacy = connectivity.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+                } catch (RuntimeException ignored) { /* retain an unknown observation */ }
+                if (legacy != null) next = legacy.isConnected();
+                else if (networksKnown || info != null) next = Boolean.FALSE;
+            }
+            if (next == null) return;
             final int before = TrioState.sWifiLevel;
             publish(next);
             if (!next) {
                 TrioState.sWifiLevel = -1;
             } else {
                 // Hidden native icons may not rebind after reconnect.
-                final WifiInfo info = wifi.getConnectionInfo();
                 if (info != null && info.getRssi() > -127) {
-                    TrioState.sWifiLevel = WifiManager.calculateSignalLevel(info.getRssi(), 5);
+                    int level = Build.VERSION.SDK_INT >= 30 ? wifi.calculateSignalLevel(info.getRssi())
+                            : WifiManager.calculateSignalLevel(info.getRssi(), 5);
+                    TrioState.sWifiLevel = Math.max(0, Math.min(4, level));
                 }
             }
             if (before != TrioState.sWifiLevel) TrioHooks.invalidateHosts();

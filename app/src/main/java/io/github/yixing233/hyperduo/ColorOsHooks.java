@@ -1,0 +1,912 @@
+/*
+ * Copyright (C) 2026 ColorDuo contributors
+ * Based on HyperDuo by yixing233 and contributors.
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+package io.github.yixing233.hyperduo;
+
+import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.ColorFilter;
+import android.graphics.Paint;
+import android.graphics.PixelFormat;
+import android.graphics.drawable.Drawable;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.PowerManager;
+import android.os.SystemClock;
+import android.provider.Settings;
+import android.telephony.SubscriptionInfo;
+import android.telephony.SubscriptionManager;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewParent;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+
+import java.lang.ref.WeakReference;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Executable;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
+
+import io.github.libxposed.api.XposedInterface;
+import io.github.libxposed.api.XposedModule;
+
+/** ColorOS 17 adapter, verified against OnePlus SystemUI 17.99.02 (API 37). */
+final class ColorOsHooks {
+    static final String METER_CLASS =
+            "com.oplus.systemui.statusbar.pipeline.battery.ui.view.StatBatteryMeterView";
+    private static final String BATTERY = "com.oplus.systemui.statusbar.pipeline.battery.";
+    private static final String WIFI = "com.android.systemui.statusbar.pipeline.wifi.";
+    private static final String MOBILE = "com.oplus.systemui.statusbar.pipeline.mobile.ui.viewmodel.";
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
+    // Views retain their Host as an attach listener. Neither side of this lookup roots a view tree.
+    private static final Map<View, WeakReference<Host>> HOSTS = new WeakHashMap<>();
+    private static final Map<View, WeakReference<Host>> CHILDREN = new WeakHashMap<>();
+    private static final Map<Integer, Mobile> MOBILES = new ConcurrentHashMap<>();
+    private static volatile Object wifiFlow;
+    private static volatile WifiSample renderedWifi = WifiSample.UNKNOWN;
+    private static Class<?> wifiActiveClass;
+    private static Class<?> wifiCarrierMergedClass;
+    private static final Set<Class<?>> disconnectedWifiClasses = new HashSet<>();
+    private static volatile Object batteryLevelFlow;
+    private static volatile Object chargeFlow;
+    private static volatile Object savingFlow;
+    private static volatile boolean installed;
+    private static boolean refreshQueued;
+    private static boolean tickerStarted;
+    private static Class<?> meterClass;
+    private static Class<?> phoneBarClass;
+    private static Class<?> statusIconsClass;
+    private static Context context;
+    private static String lastBatterySample;
+    private static long nextSimPoll;
+    private static final ColorOsLayout.Tree<View> VIEW_TREE = new ColorOsLayout.Tree<>() {
+        @Override public View parent(View view) {
+            return view.getParent() instanceof View ? (View) view.getParent() : null;
+        }
+        @Override public String id(View view) { return resourceName(view); }
+        @Override public int childCount(View view) {
+            return view instanceof ViewGroup ? ((ViewGroup) view).getChildCount() : 0;
+        }
+        @Override public View childAt(View view, int index) { return ((ViewGroup) view).getChildAt(index); }
+        @Override public boolean isIconContainer(View view) {
+            return statusIconsClass != null && statusIconsClass.isInstance(view);
+        }
+    };
+
+    private ColorOsHooks() {}
+
+    static boolean isInstalled() { return installed; }
+
+    /** Normalize the ROM's input units before the unchanged upstream power calculation. */
+    static int batteryCurrentMicroAmps(int reported, int voltageMilliVolts) {
+        int current = ColorOsPolicy.batteryCurrentMicroAmps(Build.FINGERPRINT, reported);
+        String note = "ColorOS battery: rawCurrent=" + reported
+                + " rawUnit=" + (ColorOsPolicy.batteryReportsMilliamps(Build.FINGERPRINT) ? "mA" : "uA")
+                + " currentMicroAmps=" + current + " voltageMilliVolts=" + voltageMilliVolts;
+        if (lastBatterySample == null || (TrioConfig.debugLog() && !note.equals(lastBatterySample))) {
+            TrioHooks.log(TrioHooks.LOG_INFO, note);
+        }
+        lastBatterySample = note;
+        return current;
+    }
+
+    static void install(XposedModule module, ClassLoader loader) {
+        meterClass = Refl.cls(METER_CLASS, loader);
+        phoneBarClass = Refl.cls("com.android.systemui.statusbar.phone.PhoneStatusBarView", loader);
+        statusIconsClass = Refl.cls("com.android.systemui.statusbar.phone.StatusIconContainer", loader);
+        wifiActiveClass = Refl.cls(WIFI + "shared.model.WifiNetworkModel$Active", loader);
+        wifiCarrierMergedClass = Refl.cls(WIFI + "shared.model.WifiNetworkModel$CarrierMerged", loader);
+        for (String name : new String[] {"Inactive", "Unavailable", "Invalid"}) {
+            Class<?> type = Refl.cls(WIFI + "shared.model.WifiNetworkModel$" + name, loader);
+            if (type != null) disconnectedWifiClasses.add(type);
+        }
+        if (meterClass == null || phoneBarClass == null) {
+            throw new IllegalStateException("ColorOS battery/status bar classes unavailable");
+        }
+        TrioHooks.useLogger(module);
+        installed = true;
+        TrioConfig.install(module);
+        TrioConfig.addListener(ColorOsHooks::invalidateHosts);
+
+        int count = 0;
+        // OEM/R8 builds can inline binder helpers. Filter framework writes by our exact child
+        // instances too, so an inlined style update cannot leave a stale restoration snapshot.
+        count += hook(module, Refl.method(ImageView.class, "setImageDrawable", Drawable.class), chain -> {
+            Host owner = childOwner((View) chain.getThisObject());
+            if (owner == null || owner.image != chain.getThisObject()
+                    || owner.moduleWriting || owner.nativeDepth != 0) return chain.proceed();
+            Drawable drawable = (Drawable) chain.getArg(0);
+            if (drawable == owner.glyph) return chain.proceed();
+            owner.nativeDrawable = drawable;
+            if (!owner.active) return chain.proceed();
+            ViewGroup.LayoutParams current = owner.image.getLayoutParams();
+            if (current instanceof LinearLayout.LayoutParams
+                    && (current.width != owner.ownedWidth || current.height != owner.ownedHeight)) {
+                owner.nativeParams = new LinearLayout.LayoutParams((LinearLayout.LayoutParams) current);
+            }
+            Object result = chain.proceed(new Object[] {owner.glyph});
+            owner.enforceImageSize();
+            return result;
+        });
+        count += hook(module, Refl.method(ImageView.class, "setScaleType", ImageView.ScaleType.class), chain -> {
+            Host owner = childOwner((View) chain.getThisObject());
+            if (owner == null || owner.image != chain.getThisObject()
+                    || owner.moduleWriting || owner.nativeDepth != 0) return chain.proceed();
+            owner.nativeScaleType = (ImageView.ScaleType) chain.getArg(0);
+            return owner.active ? chain.proceed(new Object[] {ImageView.ScaleType.FIT_XY}) : chain.proceed();
+        });
+        count += hook(module, Refl.method(View.class, "setVisibility", int.class), chain -> {
+            View view = (View) chain.getThisObject();
+            Host owner = childOwner(view);
+            if (owner == null || owner.moduleWriting || owner.nativeDepth != 0) return chain.proceed();
+            owner.nativeVisibility.put(view, (Integer) chain.getArg(0));
+            Integer desired = owner.visibilityOverrides.get(view);
+            return owner.active && desired != null ? chain.proceed(new Object[] {desired}) : chain.proceed();
+        });
+        for (Method method : meterClass.getDeclaredMethods()) {
+            String name = method.getName();
+            if (name.equals("onFinishInflate") || name.equals("onAttachedToWindow")
+                    || name.equals("bindViewModel") || name.equals("onDarkChanged")
+                    || name.equals("onConfigurationChanged") || name.equals("disable")
+                    || name.equals("onHiddenChanged") || name.equals("setHiddenIconListChanged")) {
+                count += hook(module, method, chain -> {
+                    ViewGroup meter = (ViewGroup) chain.getThisObject();
+                    Host host = host(meter);
+                    if (chain.getExecutable().getName().equals("bindViewModel")) {
+                        host.viewModel = chain.getArg(0);
+                    }
+                    return nativeUpdate(host, chain);
+                });
+            }
+        }
+
+        // All binder writes happen against the native view state. Capture the result once the
+        // outermost binder call finishes, then put our drawable back. This also handles the old
+        // horizontal style, which uses a separate ProgressBar instead of battery_icon_view.
+        Class<?> binder = Refl.cls(BATTERY + "ui.binder.BatteryViewBinder", loader);
+        if (binder != null) for (Method method : binder.getDeclaredMethods()) {
+            if (!method.getName().startsWith("bind")) continue;
+            count += hook(module, method, chain -> {
+                Host owner = null;
+                for (Object arg : chain.getArgs()) {
+                    if (arg instanceof View) {
+                        owner = existingHost((View) arg);
+                        if (owner != null) break;
+                    }
+                }
+                return owner == null ? chain.proceed() : nativeUpdate(owner, chain);
+            });
+        }
+
+        count += captureWifiFlow(module, loader, WIFI + "data.repository.WifiRepositorySwitcher");
+        count += captureWifiFlow(module, loader, WIFI + "data.repository.prod.WifiRepositoryImpl");
+        // Observe the model actually converted into the native icon. Merely reading an unused
+        // WhileSubscribed repository can keep returning its initial Inactive snapshot forever.
+        Class<?> wifiIcons = Refl.cls(WIFI + "ui.model.WifiIcon$Companion", loader);
+        if (wifiIcons != null) for (Method method : wifiIcons.getDeclaredMethods()) {
+            if (!method.getName().equals("fromModel") || method.getParameterCount() != 3) continue;
+            count += hook(module, method, chain -> {
+                Object result = chain.proceed();
+                WifiSample sample = wifiSample(chain.getArg(0));
+                WifiSample previous = renderedWifi;
+                renderedWifi = sample;
+                if (!java.util.Objects.equals(previous.connected, sample.connected)
+                        || previous.level != sample.level || previous.carrierMerged != sample.carrierMerged) {
+                    invalidateHosts();
+                }
+                return result;
+            });
+        }
+        count += captureMobileModels(module, loader, "OplusCellularIconViewModelImpl", false);
+        count += captureMobileModels(module, loader, "OplusMobileIconViewModel", true);
+        // This call remains in both initViews and the live Flow collector in the reference DEX.
+        // Observe explicit null updates too, so a disconnect cannot retain the last label.
+        Class<?> mobileBinding = Refl.cls(
+                "com.oplus.systemui.statusbar.pipeline.mobile.ui.view.OplusStatusBarMobileViewBinder$Os17Binding", loader);
+        Class<?> networkType = Refl.cls(
+                "com.android.systemui.statusbar.pipeline.mobile.domain.model.OplusNetworkTypeTextModel", loader);
+        if (networkType != null) count += hook(module,
+                Refl.method(mobileBinding, "bindNetworkTypeText", networkType), chain -> {
+                    Object result = chain.proceed();
+                    Object model = ColorOsPolicy.nativeMember(chain.getThisObject(),
+                            "oplusViewModel", "getOplusViewModel");
+                    Mobile mobile = captureMobileModel(model, true);
+                    if (mobile != null) {
+                        String text = ColorOsPolicy.networkType(chain.getArg(0));
+                        if (!text.equals(mobile.renderedType)) {
+                            mobile.renderedType = text;
+                            invalidateHosts();
+                        }
+                    }
+                    return result;
+                });
+        for (String name : new String[] {"getBatteryLevel", "getChargeState", "isSavingMode"}) {
+            Method method = Refl.method(Refl.cls(BATTERY + "data.repository.BatteryRepositoryImpl", loader), name);
+            if (method == null) continue;
+            count += hook(module, method, chain -> {
+                Object result = chain.proceed();
+                if (name.equals("getBatteryLevel")) batteryLevelFlow = result;
+                else if (name.equals("getChargeState")) chargeFlow = result;
+                else savingFlow = result;
+                return result;
+            });
+        }
+
+        TrioHooks.log(TrioHooks.LOG_INFO, "ColorOS adapter installed, hooks=" + count
+                + " frameworkApi=" + module.getApiVersion()
+                + " SystemUI=" + METER_CLASS);
+    }
+
+    private static int hook(XposedModule module, Executable method, XposedInterface.Hooker callback) {
+        if (method == null) return 0;
+        try {
+            method.setAccessible(true);
+            module.hook(method).setId("colorduo:" + method.toGenericString()).intercept(callback);
+            return 1;
+        } catch (Throwable error) {
+            TrioHooks.log(TrioHooks.LOG_WARN, "ColorOS skip " + method.getName() + ": " + error);
+            return 0;
+        }
+    }
+
+    private static int captureMobileModels(XposedModule module, ClassLoader loader,
+                                          String name, boolean wrapper) {
+        Class<?> type = Refl.cls(MOBILE + name, loader);
+        if (type == null) return 0;
+        int count = 0;
+        for (Constructor<?> constructor : type.getDeclaredConstructors()) {
+            count += hook(module, constructor, chain -> {
+                Object result = chain.proceed();
+                Mobile mobile = captureMobileModel(chain.getThisObject(), wrapper);
+                if (mobile != null) {
+                    if (wrapper) mobile.renderedType = null;
+                    if (chain.getArgs().size() > 2) {
+                        Object interactor = chain.getArg(2);
+                        mobile.iconGroup = Refl.callByName(interactor, "getNetworkTypeIconGroup");
+                        mobile.inService = Refl.callByName(interactor, "isInService");
+                    }
+                }
+                invalidateHosts();
+                return result;
+            });
+        }
+        // Keep getter observation for firmware variants that do not inline these calls.
+        for (String getter : new String[] {"getIcon", "getNetworkTypeText"}) {
+            count += hook(module, Refl.method(type, getter), chain -> {
+                Object result = chain.proceed();
+                Mobile mobile = mobileFor(chain.getThisObject());
+                if (mobile != null) {
+                    if (getter.equals("getIcon")) {
+                        if (wrapper) mobile.icon = result;
+                        else mobile.cellularIcon = result;
+                    } else {
+                        if (wrapper) mobile.type = result;
+                        else mobile.cellularType = result;
+                    }
+                }
+                return result;
+            });
+        }
+        return count;
+    }
+
+    private static Mobile captureMobileModel(Object model, boolean wrapper) {
+        Mobile mobile = mobileFor(model);
+        if (mobile == null) return null;
+        Object icon = ColorOsPolicy.nativeMember(model, "icon", "getIcon");
+        Object type = ColorOsPolicy.nativeMember(model, "networkTypeText", "getNetworkTypeText");
+        if (wrapper) {
+            mobile.icon = icon;
+            mobile.type = type;
+        } else {
+            mobile.cellularIcon = icon;
+            mobile.cellularType = type;
+        }
+        return mobile;
+    }
+
+    private static Mobile mobileFor(Object model) {
+        int id = integer(ColorOsPolicy.nativeMember(model, "subscriptionId", "getSubscriptionId"), -1);
+        return id < 0 ? null : MOBILES.computeIfAbsent(id, ignored -> new Mobile());
+    }
+
+    private static int captureWifiFlow(XposedModule module, ClassLoader loader, String className) {
+        Method method = Refl.method(Refl.cls(className, loader), "getWifiNetwork");
+        if (method == null) {
+            TrioHooks.log(TrioHooks.LOG_WARN, "ColorOS missing " + className + ".getWifiNetwork");
+            return 0;
+        }
+        return hook(module, method, chain -> {
+            Object flow = chain.proceed();
+            wifiFlow = flow;
+            return flow;
+        });
+    }
+
+    private static Object nativeUpdate(Host host, XposedInterface.Chain chain) throws Throwable {
+        boolean outer = host.nativeDepth++ == 0;
+        if (outer) host.restoreBattery();
+        try {
+            return chain.proceed();
+        } finally {
+            host.nativeDepth--;
+            if (outer) {
+                try {
+                    host.capture();
+                    host.apply();
+                } catch (Throwable error) {
+                    host.fail(error);
+                }
+            }
+        }
+    }
+
+    private static Host host(ViewGroup meter) {
+        WeakReference<Host> reference = HOSTS.get(meter);
+        Host host = reference == null ? null : reference.get();
+        if (host == null) {
+            host = new Host(meter);
+            HOSTS.put(meter, new WeakReference<>(host));
+            meter.addOnAttachStateChangeListener(host);
+        }
+        return host;
+    }
+
+    private static Host existingHost(View view) {
+        for (View current = view; current != null; ) {
+            WeakReference<Host> reference = HOSTS.get(current);
+            Host host = reference == null ? null : reference.get();
+            if (host != null) return host;
+            ViewParent parent = current.getParent();
+            current = parent instanceof View ? (View) parent : null;
+        }
+        return null;
+    }
+
+    private static Host childOwner(View view) {
+        WeakReference<Host> reference = CHILDREN.get(view);
+        return reference == null ? null : reference.get();
+    }
+
+    static void invalidateHosts() {
+        MAIN.post(() -> {
+            if (refreshQueued) return;
+            refreshQueued = true;
+            MAIN.post(() -> {
+                refreshQueued = false;
+                refreshHosts();
+            });
+        });
+    }
+
+    private static void refreshHosts() {
+        ClockTicker.refreshNow();
+        for (WeakReference<Host> reference : new ArrayList<>(HOSTS.values())) {
+            Host host = reference.get();
+            if (host == null || host.nativeDepth != 0) continue;
+            try { host.apply(); }
+            catch (Throwable error) { host.fail(error); }
+        }
+    }
+
+    private static void start(Context supplied) {
+        if (context == null) {
+            Context app = supplied.getApplicationContext();
+            context = app == null ? supplied : app;
+            TrioConfig.installReceiver(context);
+            TrioState.attachContext(context);
+        }
+        if (tickerStarted) return;
+        tickerStarted = true;
+        MAIN.post(new Runnable() {
+            @Override public void run() {
+                boolean interactive = true;
+                PowerManager power = context.getSystemService(PowerManager.class);
+                if (power != null) interactive = power.isInteractive();
+                if (interactive && TrioConfig.get().enabled) refreshHosts();
+                MAIN.postDelayed(this, interactive ? 1000L : 5000L);
+            }
+        });
+    }
+
+    private static Object value(Object flow) { return Refl.callByName(flow, "getValue"); }
+    private static String resourceName(View view) {
+        if (view == null || view.getId() == View.NO_ID) return "";
+        try { return view.getResources().getResourceEntryName(view.getId()); }
+        catch (android.content.res.Resources.NotFoundException ignored) { return ""; }
+    }
+    private static int integer(Object value, int fallback) {
+        return value instanceof Number ? ((Number) value).intValue() : fallback;
+    }
+    private static boolean bool(Object value, boolean fallback) {
+        return value instanceof Boolean ? (Boolean) value : fallback;
+    }
+
+    private static WifiSample wifiSample(Object model) {
+        if (model == null) return WifiSample.UNKNOWN;
+        int level = ColorOsPolicy.wifiModelLevel(wifiActiveClass, model);
+        if (level >= 0) {
+            return new WifiSample(Boolean.TRUE, level, false, "Active");
+        }
+        if (wifiCarrierMergedClass != null && wifiCarrierMergedClass.isInstance(model)) {
+            return new WifiSample(Boolean.FALSE, -1, true, "CarrierMerged");
+        }
+        if (disconnectedWifiClasses.contains(model.getClass())) {
+            return new WifiSample(Boolean.FALSE, -1, false, "Disconnected");
+        }
+        return WifiSample.UNKNOWN;
+    }
+
+    private static final class WifiSample {
+        static final WifiSample UNKNOWN = new WifiSample(null, -1, false, "Unknown");
+        final Boolean connected;
+        final int level;
+        final boolean carrierMerged;
+        final String kind;
+        WifiSample(Boolean connected, int level, boolean carrierMerged, String kind) {
+            this.connected = connected;
+            this.level = level;
+            this.carrierMerged = carrierMerged;
+            this.kind = kind;
+        }
+    }
+
+    private static final class Mobile {
+        volatile Object icon;
+        volatile Object type;
+        volatile Object cellularIcon;
+        volatile Object cellularType;
+        volatile Object iconGroup;
+        volatile Object inService;
+        /** null: no binder observation yet; empty: native binder explicitly cleared it. */
+        volatile String renderedType;
+
+        Object signal() {
+            Object current = value(icon);
+            return current == null ? value(cellularIcon) : current;
+        }
+
+        String networkType() {
+            if (Boolean.FALSE.equals(value(inService))) return "";
+            String current = renderedType;
+            if (current != null && !current.isEmpty()) return current;
+            // The native binder can hide RAT text because mobile data/Wi-Fi is in use.
+            // Supply its mapped identity before that visibility filter; upstream's own
+            // settings and layout still decide whether ColorDuo draws it.
+            String mapped = ColorOsPolicy.networkType(value(iconGroup));
+            if (!mapped.isEmpty()) return mapped;
+            if (current != null) return current;
+            Object model = value(type);
+            return ColorOsPolicy.networkType(model == null ? value(cellularType) : model);
+        }
+    }
+
+    private static final class Host implements View.OnAttachStateChangeListener {
+        final ViewGroup meter;
+        final TrioState state;
+        final Glyph glyph;
+        final Map<View, Integer> nativeVisibility = new IdentityHashMap<>();
+        final Map<View, Integer> visibilityOverrides = new IdentityHashMap<>();
+        final Set<View> nativeTypes = Collections.newSetFromMap(new IdentityHashMap<>());
+        final ColorOsPolicy.SlotOwnership slots = new ColorOsPolicy.SlotOwnership();
+        ImageView image;
+        ViewGroup iconContainer;
+        Object viewModel;
+        Drawable nativeDrawable;
+        LinearLayout.LayoutParams nativeParams;
+        ImageView.ScaleType nativeScaleType;
+        int nativeDepth;
+        boolean active;
+        boolean failed;
+        boolean logged;
+        boolean moduleWriting;
+        int ownedWidth;
+        int ownedHeight;
+        long nextSignalSample;
+        String lastWifiNote;
+        String lastWifiHandoff;
+        String lastMobileNote;
+        ColorOsReadings extra;
+        View clockContainer;
+
+        Host(ViewGroup meter) {
+            this.meter = meter;
+            state = new TrioState(meter);
+            glyph = new Glyph(this);
+        }
+
+        View find(String name) {
+            int id = meter.getResources().getIdentifier(name, "id", "com.android.systemui");
+            return id == 0 ? null : meter.findViewById(id);
+        }
+
+        void capture() {
+            View view = find("battery_icon_view");
+            if (!(view instanceof ImageView)) return;
+            image = (ImageView) view;
+            nativeDrawable = image.getDrawable();
+            if (image.getLayoutParams() instanceof LinearLayout.LayoutParams) {
+                nativeParams = new LinearLayout.LayoutParams((LinearLayout.LayoutParams) image.getLayoutParams());
+            }
+            nativeScaleType = image.getScaleType();
+            for (View child : nativeVisibility.keySet()) {
+                if (childOwner(child) == this) CHILDREN.remove(child);
+            }
+            nativeVisibility.clear();
+            visibilityOverrides.clear();
+            nativeTypes.clear();
+            for (String name : new String[] {"battery_icon_view", "battery_content",
+                    "battery_charge_icon", "battery_charge_reverse", "battery_percentage_view"}) {
+                View child = find(name);
+                if (child != null) {
+                    nativeVisibility.put(child, child.getVisibility());
+                    CHILDREN.put(child, new WeakReference<>(this));
+                }
+            }
+            clockContainer = null;
+            int clockId = meter.getResources().getIdentifier("clock_for_fake", "id", "com.android.systemui");
+            for (ViewParent p = meter.getParent(); p instanceof View; p = p.getParent()) {
+                if (!phoneBarClass.isInstance(p)) continue;
+                clockContainer = ((View) p).findViewById(clockId);
+                if (clockContainer != null) {
+                    nativeVisibility.put(clockContainer, clockContainer.getVisibility());
+                    CHILDREN.put(clockContainer, new WeakReference<>(this));
+                }
+                break;
+            }
+        }
+
+        void apply() {
+            boolean previous = moduleWriting;
+            moduleWriting = true;
+            try { applyInternal(); }
+            finally { moduleWriting = previous; }
+        }
+
+        void applyInternal() {
+            if (nativeDepth != 0) return;
+            if (image == null) capture();
+            // Like upstream's class-wide battery draw hook, every supported meter instance
+            // can carry the glyph, including keyguard and expanded/collapsed shade headers.
+            boolean wanted = !failed && TrioConfig.get().enabled
+                    && meter.isAttachedToWindow() && meter.getVisibility() == View.VISIBLE
+                    && image != null && nativeParams != null;
+            if (!wanted) {
+                restore();
+                return;
+            }
+            start(meter.getContext());
+            readState();
+            // An unknown battery state must leave a complete native status bar available.
+            if (state.level < 0 || state.level > 100) {
+                restore();
+                return;
+            }
+            if (!active) capture();
+            active = true;
+            TrioAppearance appearance = TrioConfig.appearance();
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(nativeParams);
+            int height = Math.round(20 * meter.getResources().getDisplayMetrics().density);
+            TrioGeometry.setCapsuleLength(appearance.capsuleLength);
+            params.height = appearance.capsule ? TrioGeometry.capHostHeightPx(height * 3 / 4) : height;
+            params.width = appearance.capsule ? TrioGeometry.capHostWidthPx(height * 3 / 4)
+                    : Math.round(24 * meter.getResources().getDisplayMetrics().density);
+            ownedWidth = params.width;
+            ownedHeight = params.height;
+            if (image.getLayoutParams().width != params.width || image.getLayoutParams().height != params.height) {
+                image.setLayoutParams(params);
+            }
+            image.setScaleType(ImageView.ScaleType.FIT_XY);
+            if (image.getDrawable() != glyph) image.setImageDrawable(glyph);
+            visibilityOverrides.put(image, View.VISIBLE);
+            image.setVisibility(View.VISIBLE);
+            hide("battery_content", true);
+            hide("battery_percentage_view", !appearance.handsBackPercentage());
+            hide("battery_charge_icon", appearance.hidesNativeBolt());
+            hide(clockContainer, appearance.hidesStatusClock()
+                    && TrioState.sClockText != null && !TrioState.sClockText.isEmpty());
+            syncExtra(appearance);
+            syncSlots(appearance);
+            glyph.invalidateSelf();
+            if (!logged) {
+                logged = true;
+                View row = ColorOsLayout.rowFor(meter, VIEW_TREE);
+                View root = row == null ? null : VIEW_TREE.parent(row);
+                TrioHooks.log(TrioHooks.LOG_INFO, "ColorOS host active: meter=" + resourceName(meter)
+                        + " row=" + resourceName(row) + " parent=" + (root == null ? "none" : root.getClass().getName())
+                        + " level=" + state.level + " wifiFlow=" + (wifiFlow != null)
+                        + " wifiLevel=" + state.wifiLevel + " wifiPresent=" + state.wifiPresent
+                        + " mobileSubscriptions=" + MOBILES.size());
+            }
+        }
+
+        void hide(String name, boolean hidden) {
+            hide(find(name), hidden);
+        }
+
+        void hide(View view, boolean hidden) {
+            Integer original = nativeVisibility.get(view);
+            if (view != null && original != null) {
+                if (hidden) visibilityOverrides.put(view, View.GONE);
+                else visibilityOverrides.remove(view);
+                view.setVisibility(hidden ? View.GONE : original);
+            }
+        }
+
+        void enforceImageSize() {
+            boolean previous = moduleWriting;
+            moduleWriting = true;
+            try {
+                ViewGroup.LayoutParams params = image.getLayoutParams();
+                if (params.width != ownedWidth || params.height != ownedHeight) {
+                    LinearLayout.LayoutParams fixed = new LinearLayout.LayoutParams(nativeParams);
+                    fixed.width = ownedWidth;
+                    fixed.height = ownedHeight;
+                    image.setLayoutParams(fixed);
+                }
+            } finally { moduleWriting = previous; }
+        }
+
+        void restoreBattery() {
+            boolean previous = moduleWriting;
+            moduleWriting = true;
+            try { restoreBatteryInternal(); }
+            finally { moduleWriting = previous; }
+        }
+
+        void restoreBatteryInternal() {
+            if (active && image != null) {
+                image.setImageDrawable(nativeDrawable);
+                image.setScaleType(nativeScaleType);
+                if (nativeParams != null) image.setLayoutParams(new LinearLayout.LayoutParams(nativeParams));
+                for (Map.Entry<View, Integer> entry : nativeVisibility.entrySet()) {
+                    entry.getKey().setVisibility(entry.getValue());
+                }
+            }
+            active = false;
+            if (extra != null) extra.setVisibility(View.GONE);
+        }
+
+        void restore() {
+            restoreBattery();
+            releaseSlots();
+        }
+
+        void fail(Throwable error) {
+            failed = true;
+            try { restore(); } catch (Throwable ignored) { /* preserve the original exception */ }
+            TrioHooks.log(TrioHooks.LOG_WARN, "ColorOS host restored after failure: " + error);
+        }
+
+        void readState() {
+            Object battery = value(Refl.callByName(viewModel, "getBatteryIcon"));
+            if (battery == null) battery = Refl.callByName(meter, "getBatteryIcon");
+            state.level = integer(value(batteryLevelFlow), integer(Refl.callByName(battery, "getPowerLevel"), -1));
+            state.useTint = true;
+            Object color = value(Refl.callByName(viewModel, "getBatteryColor"));
+            state.tintColor = integer(Refl.callByName(color, "getSingleToneColor"),
+                    integer(Refl.callByName(battery, "getTintColor"), 0xFFFFFFFF));
+            Object charge = value(chargeFlow);
+            if (charge == null && viewModel != null) {
+                charge = Refl.get(Refl.field(viewModel.getClass(), "chargeState"), viewModel);
+            }
+            state.charging = bool(Refl.callByName(charge, "getCharging"), TrioState.sChargingAttached);
+            state.quickCharging = bool(Refl.callByName(charge, "getSuperVoocCharging"), false)
+                    || bool(Refl.callByName(charge, "getWirelessVoocCharging"), false);
+            state.powerSave = bool(value(savingFlow), bool(Refl.get(
+                    Refl.field(viewModel == null ? null : viewModel.getClass(), "isSavingMode"), viewModel), false));
+            state.low = state.level >= 0 && state.level <= 15;
+
+            // Wi-Fi reads cached observations only. Process every connection notification even
+            // inside the telephony sampling interval so disconnect/reconnect is not delayed.
+            WifiSample nativeSample = renderedWifi;
+            WifiSample repository = wifiSample(value(wifiFlow));
+            Boolean connected = WifiPresence.connectedSnapshot();
+            boolean carrierMerged = nativeSample.connected == null
+                    ? repository.carrierMerged : nativeSample.carrierMerged;
+            state.wifiLevel = ColorOsPolicy.wifiLevel(connected, TrioState.sWifiLevel,
+                    nativeSample.connected, nativeSample.level, repository.level, carrierMerged);
+            state.wifiPresent = !carrierMerged && (state.wifiLevel >= 0
+                    || Boolean.TRUE.equals(connected) || Boolean.TRUE.equals(nativeSample.connected));
+            if (TrioConfig.debugLog()) {
+                String note = "ColorOS wifi: connected=" + connected
+                        + " rendered=" + nativeSample.kind + "/" + nativeSample.level
+                        + " repository=" + repository.kind + "/" + repository.level
+                        + " platformLevel=" + TrioState.sWifiLevel + " resolved=" + state.wifiLevel;
+                if (!note.equals(lastWifiNote)) {
+                    lastWifiNote = note;
+                    TrioHooks.log(TrioHooks.LOG_INFO, note);
+                }
+            }
+
+            // Dark-mode animation dispatches many binder updates per second. Only cached battery
+            // and color values are read on those updates; telephony IPC is bounded independently.
+            long now = SystemClock.elapsedRealtime();
+            if (now < nextSignalSample) return;
+            nextSignalSample = now + 1000L;
+            if (now >= nextSimPoll) {
+                nextSimPoll = now + 1000L;
+                TrioState.pollSimsNow();
+            }
+            state.slotLevels = TrioState.sSlotLevels.clone();
+            state.mobileLevel = -1;
+            state.mobileType = "";
+            if (Settings.Global.getInt(context.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0) != 0) {
+                state.slotLevels = new int[] {-1, -1};
+                state.sims = 0;
+                TrioState.setMobileType("");
+                return;
+            }
+            int dataId = SubscriptionManager.getDefaultDataSubscriptionId();
+            try {
+                SubscriptionManager manager = context.getSystemService(SubscriptionManager.class);
+                List<SubscriptionInfo> subscriptions = manager == null ? null : manager.getActiveSubscriptionInfoList();
+                if (subscriptions != null) for (SubscriptionInfo subscription : subscriptions) {
+                    int id = subscription.getSubscriptionId();
+                    int slot = subscription.getSimSlotIndex();
+                    if (slot < 0 || slot >= state.slotLevels.length) continue;
+                    Mobile mobile = MOBILES.get(id);
+                    Object signal = mobile == null ? null : mobile.signal();
+                    if (signal != null && signal.getClass().getName().endsWith("$Cellular")) {
+                        boolean inService = bool(Refl.get(Refl.field(signal.getClass(), "isInService"), signal), false);
+                        int level = ColorOsPolicy.mobileLevel(integer(Refl.callByName(signal, "getLevel"), -1),
+                                integer(Refl.callByName(signal, "getNumberOfLevels"), -1), inService);
+                        if (level >= 0) state.slotLevels[slot] = level;
+                    } else if (signal != null) {
+                        // Satellite models share the icon channel, but are not cellular bars.
+                        state.slotLevels[slot] = -1;
+                    }
+                    if (id == dataId || (dataId < 0 && state.mobileLevel < 0)) {
+                        state.mobileLevel = state.slotLevels[slot];
+                        state.mobileType = mobile == null ? "" : mobile.networkType();
+                    }
+                }
+            } catch (RuntimeException error) {
+                if (TrioConfig.debugLog()) TrioHooks.log(TrioHooks.LOG_WARN, "ColorOS telephony: " + error);
+            }
+            state.sims = (state.slotLevels[0] >= 0 ? 1 : 0) + (state.slotLevels[1] >= 0 ? 1 : 0);
+            TrioState.setMobileType(state.mobileType);
+            if (TrioConfig.debugLog()) {
+                String note = "ColorOS mobile: models=" + MOBILES.size() + " dataSlot=" + TrioState.sDataSlot
+                        + " levels=" + java.util.Arrays.toString(state.slotLevels) + " type=" + state.mobileType;
+                if (!note.equals(lastMobileNote)) {
+                    lastMobileNote = note;
+                    TrioHooks.log(TrioHooks.LOG_INFO, note);
+                }
+            }
+        }
+
+        @SuppressWarnings("unchecked")
+        void updateSlots(Set<String> wanted) {
+            if (iconContainer == null) return;
+            Object ignored = Refl.get(Refl.field(iconContainer.getClass(), "mIgnoredSlots"), iconContainer);
+            if (!(ignored instanceof Set)) return;
+            if (slots.sync((Set<String>) ignored, wanted)) {
+                iconContainer.requestLayout();
+                Refl.callByName(iconContainer, "updateStates");
+            }
+        }
+
+        void releaseSlots() { updateSlots(Collections.emptySet()); }
+
+        void releaseNativeTypes() {
+            for (View type : nativeTypes) {
+                hide(type, false);
+                nativeVisibility.remove(type);
+                visibilityOverrides.remove(type);
+                if (childOwner(type) == this) CHILDREN.remove(type);
+            }
+            nativeTypes.clear();
+        }
+
+        void syncSlots(TrioAppearance appearance) {
+            View resolved = ColorOsLayout.iconsFor(meter, VIEW_TREE);
+            if (iconContainer != resolved) {
+                releaseSlots();
+                releaseNativeTypes();
+                iconContainer = resolved instanceof ViewGroup ? (ViewGroup) resolved : null;
+            }
+            Set<String> wanted = new HashSet<>();
+            if (iconContainer != null) for (int i = 0; i < iconContainer.getChildCount(); i++) {
+                Object slot = Refl.callByName(iconContainer.getChildAt(i), "getSlot");
+                if (!(slot instanceof String)) continue;
+                if (slot.equals("wifi") && appearance.ownsWifi() && state.wifiLevel >= 0) wanted.add((String) slot);
+                if (slot.equals("mobile") || slot.equals("stacked_mobile")) {
+                    if (appearance.foldsMobile() && state.sims > 0) wanted.add((String) slot);
+                    // Upstream also hands off the RAT label when bars remain native.
+                    // Track only these children; never hide the whole radio for a type label.
+                    for (String name : new String[] {"mobile_type_text", "mobile_type_image"}) {
+                        int id = meter.getResources().getIdentifier(name, "id", "com.android.systemui");
+                        View type = id == 0 ? null : iconContainer.getChildAt(i).findViewById(id);
+                        if (type == null) continue;
+                        if (!nativeVisibility.containsKey(type)) {
+                            nativeVisibility.put(type, type.getVisibility());
+                            CHILDREN.put(type, new WeakReference<>(this));
+                        }
+                        nativeTypes.add(type);
+                        hide(type, appearance.ownsType());
+                    }
+                }
+            }
+            updateSlots(wanted);
+            if (TrioConfig.debugLog()) {
+                String note = "ColorOS wifi handoff: owns=" + appearance.ownsWifi()
+                        + " level=" + state.wifiLevel + " container=" + (iconContainer != null)
+                        + " requested=" + wanted;
+                if (!note.equals(lastWifiHandoff)) {
+                    lastWifiHandoff = note;
+                    TrioHooks.log(TrioHooks.LOG_INFO, note);
+                }
+            }
+        }
+
+        void syncExtra(TrioAppearance appearance) {
+            if (extra == null) {
+                ViewParent parent = meter.getParent();
+                // QS uses ConstraintLayout with an end-to-start battery constraint. Put the
+                // strip inside its LinearLayout meter so the battery's measured width reserves
+                // space automatically. Standard status/keyguard rows accept a sibling strip.
+                ViewGroup row = parent instanceof LinearLayout ? (ViewGroup) parent : meter;
+                extra = new ColorOsReadings(meter.getContext(), state, image);
+                row.addView(extra, row == meter ? 0 : row.indexOfChild(meter), new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            }
+            extra.update(appearance);
+        }
+
+        @Override public void onViewAttachedToWindow(View view) {
+            MAIN.post(() -> { try { apply(); } catch (Throwable error) { fail(error); } });
+        }
+        @Override public void onViewDetachedFromWindow(View view) {
+            restore();
+            releaseNativeTypes();
+            iconContainer = null;
+            if (extra != null && extra.getParent() instanceof ViewGroup) {
+                ((ViewGroup) extra.getParent()).removeView(extra);
+                extra = null;
+            }
+        }
+    }
+
+    private static final class Glyph extends Drawable {
+        final Host host;
+        final Paint layerPaint = new Paint();
+        Glyph(Host host) { this.host = host; }
+
+        @Override public void draw(Canvas canvas) {
+            if (!host.active || host.failed || getBounds().isEmpty()) return;
+            // The shared renderer clears its canvas. A clipped layer confines that clear to the
+            // battery drawable, keeping neighbouring SystemUI icons on the parent canvas intact.
+            int save = canvas.save();
+            try {
+                canvas.saveLayer(getBounds().left, getBounds().top,
+                        getBounds().right, getBounds().bottom, layerPaint);
+                canvas.translate(getBounds().left, getBounds().top);
+                canvas.clipRect(0, 0, getBounds().width(), getBounds().height());
+                TrioRenderer.drawState(canvas, getBounds().width(), getBounds().height(),
+                        host.state, TrioConfig.get());
+            } catch (Throwable error) {
+                host.failed = true;
+                MAIN.post(() -> host.fail(error));
+            } finally { canvas.restoreToCount(save); }
+        }
+        @Override public int getIntrinsicWidth() { return 24; }
+        @Override public int getIntrinsicHeight() { return 20; }
+        @Override public void setAlpha(int alpha) { layerPaint.setAlpha(alpha); invalidateSelf(); }
+        @Override public void setColorFilter(ColorFilter filter) { layerPaint.setColorFilter(filter); invalidateSelf(); }
+        @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
+    }
+
+}

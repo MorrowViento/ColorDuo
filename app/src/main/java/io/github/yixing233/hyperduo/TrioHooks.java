@@ -88,7 +88,7 @@ import io.github.libxposed.api.XposedModule;
  */
 final class TrioHooks {
 
-    private static final String TAG = "HyperDuo";
+    private static final String TAG = "ColorDuo";
     private static final Map<View, Boolean> KEYGUARD_ROWS = new WeakHashMap<>();
     private static final Map<Object, List<String>> KEYGUARD_ADDED = new WeakHashMap<>();
     static final int LOG_INFO = 4;
@@ -116,6 +116,8 @@ final class TrioHooks {
 
     /** Module handle for logging from helpers that have no callback argument. */
     private static volatile XposedModule sModule;
+
+    static void useLogger(XposedModule module) { sModule = module; }
 
     /**
      * Every slot the module knows how to fold, one group per sub-toggle.
@@ -3056,6 +3058,10 @@ final class TrioHooks {
 
     /** Repaints every trio host. Signal updates arrive off the UI thread. */
     static void invalidateHosts() {
+        if (ColorOsHooks.isInstalled()) {
+            ColorOsHooks.invalidateHosts();
+            return;
+        }
         // The bar itself is asked to lay out again as well: the host can have
         // left the tree since the last pass, and MIUI re-derives the width it
         // gives the row, so the readings have to be measured against the new
@@ -3228,7 +3234,7 @@ final class TrioHooks {
      * would not: {@code mParent} is a strong reference from the label back to
      * the container, so such a map's values would keep their own keys alive.
      */
-    private static final class OutTypeLabel extends TextView {
+    static final class OutTypeLabel extends TextView {
         /** The glyph host supplying the ink scale and the icon colour. */
         View host;
         /**
@@ -3629,7 +3635,7 @@ final class TrioHooks {
      * setLetterSpacing} is left as it is - the tracking applies to the whole
      * label exactly as it did when the type was one size.
      */
-    private static void applyOutTypeText(OutTypeLabel label, String text, int scalePercent) {
+    static void applyOutTypeText(OutTypeLabel label, String text, int scalePercent) {
         if (!TrioGeometry.hasShrunkSuffix(text, scalePercent)) {
             // Plain text, not a spannable: an install that never shrinks the
             // suffix should not pay for span bookkeeping on every type change.
@@ -3704,7 +3710,7 @@ final class TrioHooks {
      * can match by accident, for the same reason {@link OutTypeLabel} is its own
      * class rather than a tag on somebody else's.
      */
-    private static final class PerfLabel extends TextView {
+    static final class PerfLabel extends TextView {
         /** The glyph host the ink colour comes from. */
         View host;
         /**
@@ -3910,7 +3916,7 @@ final class TrioHooks {
      * whatever the charger is doing. That asymmetry is why the two are separate
      * switches over one view.
      */
-    private static String perfText(TrioAppearance a) {
+    static String perfText(TrioAppearance a) {
         if (!a.perfAnywhere()) {
             return "";
         }
@@ -4021,7 +4027,7 @@ final class TrioHooks {
      * identity this method exists to keep. It is the readout's own weight, not
      * the type label's - see {@link Prefs#KEY_PERF_WEIGHT}.
      */
-    private static float perfTextSize(String text, View container, View host) {
+    static float perfTextSize(String text, View container, View host) {
         final float base = outTypeSizePx(container);
         final TrioAppearance a = TrioConfig.appearance();
         final float factor = a.perfFit();
@@ -4068,7 +4074,7 @@ final class TrioHooks {
      * the drawn text at the shipped -0.04em, which is the safe direction: the
      * reserve may be a hair generous, and it must never be short.
      */
-    private static int perfWidth(PerfLabel perf, String text) {
+    static int perfWidth(PerfLabel perf, String text) {
         final Paint paint = perf.getPaint();
         if (paint == null || text.length() == 0) {
             return perf.getMeasuredWidth();
@@ -4117,7 +4123,7 @@ final class TrioHooks {
      * it holds, which is what the size floor leaves behind once it is biting -
      * and there the leading is what gives, after the size already has.
      */
-    private static float perfLineSpacing(TextView view, String text,
+    static float perfLineSpacing(TextView view, String text,
                                          View container) {
         final int lines = perfLines(text);
         if (lines < 2) {
@@ -4425,7 +4431,7 @@ final class TrioHooks {
      * so priority survives the user reordering: the type label is the cheapest to lose
      * because it is one unchanging string, wherever the user chose to put it.
      */
-    private static int[] outRingDropOrder(TrioAppearance a) {
+    static int[] outRingDropOrder(TrioAppearance a) {
         final int[] order = slotOrder(a);
         final int[] drop = new int[Prefs.OUT_PRIORITY.length];
         int n = 0;
@@ -4488,7 +4494,7 @@ final class TrioHooks {
     }
 
     /** The gap one {@code OUT_SLOT_*} keeps towards its inner neighbour, in pixels. */
-    private static int outGapFor(int slot, ViewGroup container, int labelInward) {
+    static int outGapFor(int slot, ViewGroup container, int labelInward) {
         if (slot == Prefs.OUT_SLOT_SIGNAL) {
             return outSignalMargin(container);
         }
@@ -4601,7 +4607,7 @@ final class TrioHooks {
      * display's density, never the status bar row's height, which MIUI changes
      * when the control centre is pulled down.
      */
-    private static int[] outLabelMargins(View container) {
+    static int[] outLabelMargins(View container) {
         final float density = container.getResources().getDisplayMetrics().density;
         final TrioAppearance a = TrioConfig.appearance();
         return new int[] {

@@ -36,7 +36,7 @@ import java.util.Locale
  * that the checker talks to and the one the "release page" button opens can
  * never drift apart.
  */
-private const val REPO = "yixing233/HyperDuo"
+private const val REPO = "chorusfruit-233/ColorDuo"
 private const val API_LATEST = "https://api.github.com/repos/$REPO/releases/latest"
 
 /**
@@ -374,7 +374,7 @@ private fun fetchLatestFrom(url: String): UpdateInfo? {
         readTimeout = READ_TIMEOUT_MS
         // The API rejects requests without one, and advertises the pinned media
         // type so a future API default cannot change the shape of the reply.
-        setRequestProperty("User-Agent", "HyperDuo-Updater")
+        setRequestProperty("User-Agent", "ColorDuo-Updater")
         setRequestProperty("Accept", "application/vnd.github+json")
     }
     try {
@@ -394,23 +394,23 @@ private fun fetchLatestFrom(url: String): UpdateInfo? {
 /**
  * Maps a release payload onto [UpdateInfo].
  *
- * <p>The first APK asset wins. GitHub lets a release carry several, and the
- * publishing workflow attaches exactly one, so anything beyond ordering by name
- * would be guessing.
+ * <p>Only ColorDuo test/release packages qualify. This repository can also carry
+ * reference SystemUI APKs used during ROM adaptation.
  */
 private fun parseRelease(json: JSONObject): UpdateInfo {
     val tag = json.optString("tag_name").ifBlank { throw IllegalStateException("tag_name missing") }
     val version = tag.trim().removePrefix("v").removePrefix("V")
     val assets = json.optJSONArray("assets")
     var apkUrl = ""
-    var apkName = "HyperDuo-$version.apk"
+    var apkName = "ColorDuo-$version.apk"
     var apkSize = 0L
     var assetId = 0L
     if (assets != null) {
         for (i in 0 until assets.length()) {
             val asset = assets.optJSONObject(i) ?: continue
             val name = asset.optString("name")
-            if (!name.endsWith(".apk", ignoreCase = true)) continue
+            if (!name.startsWith("ColorDuo-", ignoreCase = true)
+                || !name.endsWith(".apk", ignoreCase = true)) continue
             apkUrl = asset.optString("browser_download_url")
             apkName = name
             apkSize = asset.optLong("size")
@@ -489,7 +489,7 @@ private fun downloadToFile(url: String, target: File, onProgress: (Float) -> Uni
         requestMethod = "GET"
         connectTimeout = CONNECT_TIMEOUT_MS
         readTimeout = READ_TIMEOUT_MS
-        setRequestProperty("User-Agent", "HyperDuo-Updater")
+        setRequestProperty("User-Agent", "ColorDuo-Updater")
         // The browser URL redirects to a signed CDN URL, and the API endpoint
         // does too unless the octet-stream type is asked for; the default follow
         // is what makes either work.
@@ -537,7 +537,7 @@ private fun sanitise(name: String, version: String): String {
     val cleaned = name.map { if (it.isLetterOrDigit() || it in "._-") it else '_' }
         .joinToString("")
         .takeIf { it.isNotBlank() }
-        ?: "HyperDuo-$version.apk"
+        ?: "ColorDuo-$version.apk"
     return if (cleaned.endsWith(".apk", ignoreCase = true)) cleaned else "$cleaned.apk"
 }
 

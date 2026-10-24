@@ -4,12 +4,9 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
-// Release CI derives both numbers from the pushed tag and passes them in, so the
-// version in the APK, the version in the About card and the version the updater
-// compares against are all the same value. A local build falls back to the
-// checked-in defaults below.
-val tagVersionName = (findProperty("hyperduoVersionName") as String?)?.takeIf { it.isNotBlank() }
-val tagVersionCode = (findProperty("hyperduoVersionCode") as String?)?.toIntOrNull()
+// Keep the old property aliases for upstream build scripts.
+val tagVersionName = ((findProperty("colorduoVersionName") ?: findProperty("hyperduoVersionName")) as String?)?.takeIf { it.isNotBlank() }
+val tagVersionCode = ((findProperty("colorduoVersionCode") ?: findProperty("hyperduoVersionCode")) as String?)?.toIntOrNull()
 
 android {
     // io.github.* because LSPosed's module repo verifies a reverse-domain id
@@ -18,21 +15,20 @@ android {
     // io.github.<user> form needs no domain and no TXT record.
     namespace = "io.github.yixing233.hyperduo"
     compileSdk = 37
+    buildToolsVersion = "37.0.0"
 
     defaultConfig {
-        // Changing this makes the module a different app to Android: an existing
-        // com.hyperduo.trio install cannot be updated in place, and its settings
-        // and LSPosed scope entry do not carry over. Uninstall the old one first.
-        applicationId = "io.github.yixing233.hyperduo"
+        // Keep the source namespace for upstream merges; install ColorDuo independently.
+        applicationId = "io.github.chorusfruit233.colorduo"
         minSdk = 29
         targetSdk = 36
-        versionCode = tagVersionCode ?: 2
-        versionName = tagVersionName ?: "1.1"
+        versionCode = tagVersionCode ?: 10005
+        versionName = tagVersionName ?: "0.1.0-alpha5"
     }
 
     signingConfigs {
-        // Same keystore the hand-rolled pipeline used, so that in-place updates
-        // over the already-installed module keep working.
+        // Inherited development key for reproducible test APKs. Configure a private
+        // publishing key before distributing production releases.
         create("hyperduo") {
             storeFile = rootProject.file(".tools/debug.keystore")
             storePassword = "android"

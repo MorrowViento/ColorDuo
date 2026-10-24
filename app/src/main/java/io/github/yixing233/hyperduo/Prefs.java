@@ -52,7 +52,7 @@ public final class Prefs {
      * {@code io.github.libxposed.api}, which is {@code compileOnly} and so is
      * not on the app's runtime class path.
      */
-    public static final String ACTION_RELOAD = "io.github.yixing233.hyperduo.action.RELOAD";
+    public static final String ACTION_RELOAD = "io.github.chorusfruit233.colorduo.action.RELOAD";
 
     /**
      * Package the reload broadcast is addressed to. SystemUI registers the
