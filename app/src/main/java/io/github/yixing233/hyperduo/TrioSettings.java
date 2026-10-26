@@ -211,6 +211,20 @@ public final class TrioSettings {
     /** While charging the ring centre shows the percentage; see {@link Prefs#KEY_CHARGING_SHOWS_VALUE}. */
     public boolean chargingShowsValue;
     /**
+     * The arrangement used while the device is charging, encoded by {@link ChargeLayout};
+     * "" inherits {@link #ringZones}. Read per style, so the ring and capsule keep their
+     * own charging screens.
+     */
+    public String chargingLayout = "";
+    /** As {@link #chargingLayout}, for fast charging. */
+    public String quickChargingLayout = "";
+    /**
+     * The scene an editor is currently showing, or {@link ChargeLayout#BASE} outside the
+     * charging tabs. Never persisted: it only tells a delayed save callback which key the
+     * user was looking at when they moved a component.
+     */
+    public int editingChargeScene;
+    /**
      * Absolute path of the user's font file, or "" for the system face.
      *
      * <p>Never null: the renderer treats null and "" the same, but a null here
@@ -356,6 +370,9 @@ public final class TrioSettings {
         s.wifiScale = Prefs.DEF_WIFI_SCALE;
         s.typeHideOnWifi = Prefs.DEF_TYPE_HIDE_ON_WIFI;
         s.chargingShowsValue = Prefs.DEF_CHARGING_SHOWS_VALUE;
+        s.chargingLayout = "";
+        s.quickChargingLayout = "";
+        s.editingChargeScene = ChargeLayout.BASE;
         s.fontPath = Prefs.DEF_FONT_PATH;
         s.dotScale = Prefs.DEF_DOT_SCALE;
         s.outOrder = Prefs.OUT_DEFAULT_ORDER.clone();
@@ -428,6 +445,10 @@ public final class TrioSettings {
         s.valueCentred = readStyledBoolean(p, Prefs.KEY_VALUE_CENTRED, Prefs.DEF_VALUE_CENTRED,
                 s.trioStyle);
         s.ringZones = Prefs.decodeLayout(readRingLayout(p, s.trioStyle));
+        s.chargingLayout = ChargeLayout.normalize(
+                p.getString(Prefs.styledKey(Prefs.KEY_CHARGING_LAYOUT, s.trioStyle), ""));
+        s.quickChargingLayout = ChargeLayout.normalize(
+                p.getString(Prefs.styledKey(Prefs.KEY_QUICK_CHARGING_LAYOUT, s.trioStyle), ""));
         s.dualSim = readStyledBoolean(p, Prefs.KEY_DUAL_SIM, Prefs.DEF_DUAL_SIM, s.trioStyle);
         s.signalMode = Prefs.clamp(
                 readStyledInt(p, Prefs.KEY_SIGNAL_MODE, Prefs.DEF_SIGNAL_MODE, s.trioStyle),
@@ -882,6 +903,9 @@ public final class TrioSettings {
         s.wifiScale = wifiScale;
         s.typeHideOnWifi = typeHideOnWifi;
         s.chargingShowsValue = chargingShowsValue;
+        s.chargingLayout = chargingLayout;
+        s.quickChargingLayout = quickChargingLayout;
+        s.editingChargeScene = ChargeLayout.BASE;
         s.fontPath = fontPath;
         s.dotScale = dotScale;
         s.outOrder = outOrder == null ? Prefs.OUT_DEFAULT_ORDER.clone() : outOrder.clone();
@@ -928,6 +952,9 @@ public final class TrioSettings {
             case Prefs.KEY_NAV_LABELS: navLabels = Prefs.normalizeNavLabels(src.navLabels); return true;
             case Prefs.KEY_TRIO_STYLE: trioStyle = Prefs.normalizeTrioStyle(src.trioStyle); return true;
             case Prefs.KEY_RING_LAYOUT: ringZones = copyZones(src.ringZones); return true;
+            case Prefs.KEY_CHARGING_LAYOUT: chargingLayout = src.chargingLayout; return true;
+            case Prefs.KEY_QUICK_CHARGING_LAYOUT:
+                quickChargingLayout = src.quickChargingLayout; return true;
             case Prefs.KEY_DUAL_SIM: dualSim = src.dualSim; return true;
             case Prefs.KEY_SIGNAL_MODE: signalMode = src.signalMode; return true;
             case Prefs.KEY_STACKED_SIGNAL: stackedSignal = src.stackedSignal; return true;
@@ -1015,6 +1042,10 @@ public final class TrioSettings {
         s.valueCentred = readStyledBoolean(bundle, Prefs.KEY_VALUE_CENTRED,
                 Prefs.DEF_VALUE_CENTRED, s.trioStyle);
         s.ringZones = Prefs.decodeLayout(readRingLayout(bundle, s.trioStyle));
+        s.chargingLayout = ChargeLayout.normalize(
+                bundle.getString(Prefs.styledKey(Prefs.KEY_CHARGING_LAYOUT, s.trioStyle), ""));
+        s.quickChargingLayout = ChargeLayout.normalize(
+                bundle.getString(Prefs.styledKey(Prefs.KEY_QUICK_CHARGING_LAYOUT, s.trioStyle), ""));
         s.dualSim = readStyledBoolean(bundle, Prefs.KEY_DUAL_SIM, Prefs.DEF_DUAL_SIM,
                 s.trioStyle);
         s.signalMode = Prefs.clamp(
@@ -1175,6 +1206,13 @@ public final class TrioSettings {
         b.putBoolean(Prefs.styledKey(Prefs.KEY_VALUE_CENTRED, style), valueCentred);
         b.putString(Prefs.styledKey(Prefs.KEY_RING_LAYOUT, style),
                 Prefs.encodeLayout(ringZones));
+        if (!chargingLayout.isEmpty()) {
+            b.putString(Prefs.styledKey(Prefs.KEY_CHARGING_LAYOUT, style), chargingLayout);
+        }
+        if (!quickChargingLayout.isEmpty()) {
+            b.putString(Prefs.styledKey(Prefs.KEY_QUICK_CHARGING_LAYOUT, style),
+                    quickChargingLayout);
+        }
         b.putBoolean(Prefs.styledKey(Prefs.KEY_DUAL_SIM, style), dualSim);
         b.putInt(Prefs.styledKey(Prefs.KEY_SIGNAL_MODE, style), Prefs.clamp(signalMode,
                 Prefs.MIN_SIGNAL_MODE, Prefs.MAX_SIGNAL_MODE));
@@ -1337,6 +1375,8 @@ public final class TrioSettings {
                 && wifiScale == s.wifiScale
                 && typeHideOnWifi == s.typeHideOnWifi
                 && chargingShowsValue == s.chargingShowsValue
+                && chargingLayout.equals(s.chargingLayout)
+                && quickChargingLayout.equals(s.quickChargingLayout)
                 // Objects.equals, not ==: the font path is the one reference-typed
                 // field here, and == would compare identities. Two snapshots built
                 // from the same stored path hold different String instances, so a
@@ -1363,6 +1403,8 @@ public final class TrioSettings {
         h = h * 31 + perfWeight;
         h = h * 31 + glyphScale;
         h = h * 31 + (perfTempChargingOnly ? 1 : 0);
+        h = h * 31 + chargingLayout.hashCode();
+        h = h * 31 + quickChargingLayout.hashCode();
         h = h * 31 + capsuleLeftDx;
         h = h * 31 + capsuleLeftDy;
         h = h * 31 + capsuleRightDx;

@@ -63,6 +63,33 @@ public final class ColorOsSettingsTest {
             if ((image.getRGB(x, y) >>> 24) != 0) ink++;
         }
         check(ink > 1000, "configured upstream dual-card ring paints visible artwork");
+
+        // Charging scenes keep an arrangement of their own; an absent scene inherits the
+        // live one, and a malformed stored value must never replace a working layout.
+        TrioSettings charging = dual.copy();
+        charging.ringZones = Prefs.decodeLayout("4,1|3|7|");
+        String encodedCharge = ChargeLayout.encode(charging);
+        check(ChargeLayout.normalize(encodedCharge).equals(encodedCharge),
+                "charging arrangement round-trips through the encoder");
+        check(ChargeLayout.normalize("").isEmpty(), "missing scene inherits the normal arrangement");
+        check(ChargeLayout.normalize("broken").isEmpty(), "malformed scene falls back to inheritance");
+        check(ChargeLayout.normalize("1;99999;0;0;|||").isEmpty(), "out-of-range flags are rejected");
+        check(ChargeLayout.normalize("1;4;9;0;|||").isEmpty(), "unknown network-type mode is rejected");
+
+        TrioSettings withCharge = dual.copy();
+        withCharge.chargingLayout = encodedCharge;
+        TrioSettings drawCharge = ChargeLayout.forState(withCharge, true, false);
+        check(drawCharge.editingChargeScene == ChargeLayout.CHARGING, "charging scene is reported");
+        check(Arrays.deepEquals(drawCharge.ringZones, charging.ringZones),
+                "charging scene draws its own arrangement");
+        check(ChargeLayout.forState(withCharge, false, false) == withCharge,
+                "idle scene keeps the live snapshot untouched");
+        check(ChargeLayout.forState(withCharge, true, true).editingChargeScene == ChargeLayout.QUICK,
+                "fast charging is a distinct scene");
+        check(TrioSettings.fromBundle(withCharge.toBundle()).chargingLayout
+                        .equals(withCharge.chargingLayout),
+                "charging arrangement survives settings transport");
+
         System.out.println("Upstream defaults, settings transport, dual-card selection and ring rendering passed");
     }
 
