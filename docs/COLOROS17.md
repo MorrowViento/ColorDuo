@@ -9,6 +9,7 @@ ColorDuo 是完全由 Codex 维护、专注 ColorOS 17 的 HyperDuo fork。本�
 - SystemUI：17.99.02 / 179902，API 37，9 个 DEX。
 - 参考 APK SHA-256：`a06bf8e0046a5e6a19347e09064e6ce8f79e0e963c78c8ce65f0fbf56d770e62`。
 - 框架：模块要求 libxposed API 102。用户安装的官方 LSPosed 2.2.1（7933）已在提供的加载日志中确认 API 102 和 Hook 注入。
+- 另一台同型号设备：ColorOS 17 `PJZ110_17.0.0.103(CN01C10P02)`，用于充电场景布局与推荐布局的真机验收；该固件下的结论尚未回填本节。
 
 ## 接入方式
 

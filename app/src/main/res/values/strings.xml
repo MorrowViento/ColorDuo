@@ -322,4 +322,8 @@
     <string name="font_applied">已应用字体 %1$s</string>
     <string name="font_not_a_font">这个文件不是字体（只支持 .ttf / .otf），已忽略</string>
     <string name="font_failed">字体安装失败，请重试</string>
+    <!-- One-click profile on the drawing page; replaces placement, keeps the look. -->
+    <string name="drawing_restore_recommended">恢复推荐布局</string>
+    <string name="drawing_restore_recommended_summary">把当前样式的组件位置恢复为推荐布局，颜色和尺寸保持不变。</string>
+    <string name="drawing_restore_recommended_confirm">恢复</string>
 </resources>

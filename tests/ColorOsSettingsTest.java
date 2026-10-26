@@ -1,10 +1,13 @@
 package io.github.yixing233.hyperduo;
 
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.os.Bundle;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 /** Executes real settings transport, ownership and rendering with the existing desktop shims. */
 public final class ColorOsSettingsTest {
@@ -108,7 +111,42 @@ public final class ColorOsSettingsTest {
         check(differingPixels(idleFrame, fastFrame) > 100,
                 "the fast-charging arrangement changes the rendered frame");
 
+        // The two styles keep separate charging screens: the capsule's copy lives under the
+        // @capsule suffix and must not be read as the ring's.
+        Map<String, Object> stored = new HashMap<>();
+        stored.put(Prefs.KEY_TRIO_STYLE, Prefs.STYLE_CAPSULE);
+        stored.put(Prefs.styledKey(Prefs.KEY_CHARGING_LAYOUT, Prefs.STYLE_CAPSULE), encodedCharge);
+        SharedPreferences capsulePrefs = fakePreferences(stored);
+        check(TrioSettings.from(capsulePrefs, 3f).chargingLayout.equals(encodedCharge),
+                "the capsule reads its own charging arrangement");
+        check(TrioSettings.from(capsulePrefs, 3f, Prefs.STYLE_RING).chargingLayout.isEmpty(),
+                "the ring does not inherit the capsule's charging arrangement");
+
         System.out.println("Upstream defaults, settings transport, dual-card selection and ring rendering passed");
+    }
+
+    /** A read-only preferences file, enough for TrioSettings.from(). */
+    private static SharedPreferences fakePreferences(final Map<String, Object> values) {
+        return new SharedPreferences() {
+            @Override public boolean getBoolean(String key, boolean def) {
+                Object value = values.get(key);
+                return value instanceof Boolean ? (Boolean) value : def;
+            }
+            @Override public int getInt(String key, int def) {
+                Object value = values.get(key);
+                return value instanceof Integer ? (Integer) value : def;
+            }
+            @Override public String getString(String key, String def) {
+                Object value = values.get(key);
+                return value instanceof String ? (String) value : def;
+            }
+            @Override public boolean contains(String key) {
+                return values.containsKey(key);
+            }
+            @Override public Editor edit() {
+                throw new UnsupportedOperationException("read-only fixture");
+            }
+        };
     }
 
     /** One glyph frame at a fixed state, for comparing two arrangements. */
