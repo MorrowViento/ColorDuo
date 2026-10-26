@@ -25,6 +25,17 @@ package io.github.yixing233.hyperduo;
  */
 public final class DiagnosticsReport {
     /** Facts the caller has to collect: everything here needs a Context or the framework. */
+    /**
+     * The ordered broadcast the settings app sends to ask the hooked process what it hooked.
+     * Declared here so both sides read the same strings; the permission is defined in the
+     * manifest and is signature-level.
+     */
+    public static final String REPORT_ACTION =
+            "io.github.chorusfruit_233.colorduo.action.HOOK_REPORT";
+    public static final String REPORT_PERMISSION =
+            "io.github.chorusfruit_233.colorduo.permission.HOOK_REPORT";
+    public static final String SYSTEMUI_PACKAGE = "com.android.systemui";
+
     public static final class Facts {
         public final String moduleVersion;
         public final String device;

@@ -338,4 +338,8 @@
     <string name="drawing_scene_inherit">Use the normal layout</string>
     <string name="drawing_scene_inherit_summary">Delete this state\'s own arrangement; it will follow the normal one again.</string>
     <string name="drawing_scene_inherit_confirm">Follow</string>
+    <!-- Live hook report channel: the reply is one key=value line. -->
+    <string name="about_diagnostics_live">Read live state</string>
+    <string name="about_diagnostics_live_ok">Channel ok: %1$s</string>
+    <string name="about_diagnostics_live_timeout">System UI did not answer - restart it and retry</string>
 </resources>

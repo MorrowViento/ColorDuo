@@ -8,6 +8,11 @@ package io.github.yixing233.hyperduo;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
+import android.app.Activity;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.Drawable;
@@ -55,6 +60,8 @@ final class ColorOsHooks {
     private static final Map<View, WeakReference<Host>> CHILDREN = new WeakHashMap<>();
     private static final Map<Integer, Mobile> MOBILES = new ConcurrentHashMap<>();
     private static volatile Object wifiFlow;
+    /** Guards the report receiver: registration must happen exactly once per process. */
+    private static volatile boolean reportReceiverInstalled;
     private static volatile WifiSample renderedWifi = WifiSample.UNKNOWN;
     private static Class<?> wifiActiveClass;
     private static Class<?> wifiCarrierMergedClass;
@@ -407,12 +414,50 @@ final class ColorOsHooks {
         }
     }
 
+    /**
+     * Registers the ordered-broadcast channel the settings app reads live hook state from.
+     *
+     * <p>Best-effort on purpose: a build that refuses the registration must keep drawing, so
+     * every failure path here is one log line and nothing else. Step one answers a fixed
+     * "ok" and carries no hook state - it proves the broadcast arrives and the receiver does
+     * not disturb SystemUI before any real payload is put on it.
+     */
+    private static void installHookReportReceiver(Context host) {
+        if (reportReceiverInstalled) return;
+        try {
+            BroadcastReceiver receiver = new BroadcastReceiver() {
+                @Override public void onReceive(Context received, Intent intent) {
+                    try {
+                        setResultCode(Activity.RESULT_OK);
+                        setResultData(HookReport.render(wifiFlow != null, MOBILES.size()));
+                    } catch (Throwable error) {
+                        TrioHooks.log(TrioHooks.LOG_WARN, "hook report reply failed: " + error);
+                    }
+                }
+            };
+            IntentFilter filter = new IntentFilter(DiagnosticsReport.REPORT_ACTION);
+            if (Build.VERSION.SDK_INT >= 33) {
+                host.registerReceiver(receiver, filter, DiagnosticsReport.REPORT_PERMISSION, null,
+                        Context.RECEIVER_EXPORTED);
+            } else {
+                host.registerReceiver(receiver, filter, DiagnosticsReport.REPORT_PERMISSION, null);
+            }
+            reportReceiverInstalled = true;
+            if (TrioConfig.debugLog()) {
+                TrioHooks.log(TrioHooks.LOG_INFO, "hook report channel ready");
+            }
+        } catch (Throwable error) {
+            TrioHooks.log(TrioHooks.LOG_WARN, "hook report channel unavailable: " + error);
+        }
+    }
+
     private static void start(Context supplied) {
         if (context == null) {
             Context app = supplied.getApplicationContext();
             context = app == null ? supplied : app;
             TrioConfig.installReceiver(context);
             TrioState.attachContext(context);
+            installHookReportReceiver(context);
         }
         if (tickerStarted) return;
         tickerStarted = true;
