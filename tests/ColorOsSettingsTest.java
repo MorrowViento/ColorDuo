@@ -100,7 +100,38 @@ public final class ColorOsSettingsTest {
                         .equals(withCharge.chargingLayout),
                 "charging arrangement survives settings transport");
 
+        // And the arrangement reaches the renderer: at one identical battery state, the idle
+        // and fast-charging arrangements must not paint the same frame. This is the end of the
+        // chain the settings tests otherwise stop short of.
+        BufferedImage idleFrame = renderGlyph(withQuick, true, true);
+        BufferedImage fastFrame = renderGlyph(ChargeLayout.forState(withQuick, true, true), true, true);
+        check(differingPixels(idleFrame, fastFrame) > 100,
+                "the fast-charging arrangement changes the rendered frame");
+
         System.out.println("Upstream defaults, settings transport, dual-card selection and ring rendering passed");
+    }
+
+    /** One glyph frame at a fixed state, for comparing two arrangements. */
+    private static BufferedImage renderGlyph(TrioSettings cfg, boolean charging, boolean quick) {
+        BufferedImage image = new BufferedImage(240, 200, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics = image.createGraphics();
+        try {
+            TrioRenderer.drawInto(new Canvas(graphics), 240, 200, 65, charging, quick,
+                    false, false, 4, 4, new int[] {4, 2}, "5G", 0xFFFFFFFF, cfg, true, true);
+        } finally {
+            graphics.dispose();
+        }
+        return image;
+    }
+
+    private static int differingPixels(BufferedImage a, BufferedImage b) {
+        int count = 0;
+        for (int y = 0; y < a.getHeight(); y++) {
+            for (int x = 0; x < a.getWidth(); x++) {
+                if (a.getRGB(x, y) != b.getRGB(x, y)) count++;
+            }
+        }
+        return count;
     }
 
     private static void check(boolean value, String message) {
