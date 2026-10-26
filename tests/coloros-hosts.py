@@ -140,7 +140,7 @@ public final class ColorOsHostTest {
         ColorOsReadings extra;
         View clockContainer;
         int nativeDepth,ownedWidth,ownedHeight;
-        boolean active,failed,logged;
+        boolean active,failed,logged,reported;
         final boolean main;
         Host(boolean main,boolean constraintParent){
             this.main=main;
