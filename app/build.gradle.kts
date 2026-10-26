@@ -20,8 +20,8 @@ android {
         applicationId = "io.github.chorusfruit_233.colorduo"
         minSdk = 29
         targetSdk = 36
-        versionCode = tagVersionCode ?: 10008
-        versionName = tagVersionName ?: "0.1.1"
+        versionCode = tagVersionCode ?: 10020
+        versionName = tagVersionName ?: "0.2.0"
     }
 
     signingConfigs {
