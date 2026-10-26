@@ -14,6 +14,15 @@
          and on MIUI they must first flip "install unknown apps" for this app. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- The live hook report travels from the hooked SystemUI back to this app over an
+         ordered broadcast. A signature permission keeps every other app out: only a
+         package signed with this key may send the request, and SystemUI (running as the
+         system uid) answers it. -->
+    <permission
+        android:name="io.github.chorusfruit_233.colorduo.permission.HOOK_REPORT"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="io.github.chorusfruit_233.colorduo.permission.HOOK_REPORT" />
+
     <!-- miuix-blur declares android:minSdkVersion="33" because its effects need
          RuntimeShader. We keep 29: every effect in the library is gated on
          isRuntimeShaderSupported() at runtime and silently falls back to plain

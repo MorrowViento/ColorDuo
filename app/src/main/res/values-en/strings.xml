@@ -332,4 +332,8 @@
     <string name="about_diagnostics_summary">Copy the current configuration and device facts for a bug report.</string>
     <string name="about_diagnostics_copy">Copy diagnostics</string>
     <string name="about_diagnostics_copied">Copied to the clipboard</string>
+    <!-- Step one of the live hook report channel; the reply is a probe string. -->
+    <string name="about_diagnostics_live">Read live state</string>
+    <string name="about_diagnostics_live_ok">Channel ok: %1$s</string>
+    <string name="about_diagnostics_live_timeout">System UI did not answer - restart it and retry</string>
 </resources>

@@ -331,4 +331,8 @@
     <string name="about_diagnostics_summary">复制当前配置和设备信息，粘贴到问题反馈里。</string>
     <string name="about_diagnostics_copy">复制诊断信息</string>
     <string name="about_diagnostics_copied">已复制到剪贴板</string>
+    <!-- Step one of the live hook report channel; the reply is a probe string. -->
+    <string name="about_diagnostics_live">读取实时状态</string>
+    <string name="about_diagnostics_live_ok">通道正常：%1$s</string>
+    <string name="about_diagnostics_live_timeout">系统界面没有响应，重启系统界面后再试</string>
 </resources>
