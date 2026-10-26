@@ -72,6 +72,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import io.github.yixing233.hyperduo.ChargeLayout
 import io.github.yixing233.hyperduo.Prefs
 import io.github.yixing233.hyperduo.R
 import io.github.yixing233.hyperduo.TrioAppearance
@@ -185,6 +186,20 @@ private enum class PreviewScene(
 /** The Wi-Fi level the preview shows: mid-strength, so arcs are drawn. */
 private const val WIFI_ON_LEVEL = 3
 
+/**
+ * The arrangement this preview state edits, if it has one of its own.
+ *
+ * <p>Charging and fast charging keep their own layout: the glyph that reads best at
+ * 64 % idle is not the one that reads best while the number climbs. The other states
+ * reuse the idle arrangement, so they map to [ChargeLayout.BASE].
+ */
+private val PreviewScene.chargeScene: Int
+    get() = when (this) {
+        PreviewScene.Charging -> ChargeLayout.CHARGING
+        PreviewScene.QuickCharging -> ChargeLayout.QUICK
+        else -> ChargeLayout.BASE
+    }
+
 /** What the renderer reads as "no Wi-Fi ink": the percentage drops to the centre. */
 private const val NO_WIFI_LEVEL = -1
 
@@ -239,8 +254,8 @@ internal fun LazyListScope.drawingTab(
 ) {
     item {
         DrawingEditorCard(
-            settings = settings,
-            update = update,
+            baseSettings = settings,
+            dispatch = update,
             onEditColor = onEditColor,
             onResetColors = onResetColors,
             snapshotForStyle = snapshotForStyle,
@@ -258,8 +273,8 @@ internal fun LazyListScope.drawingTab(
  */
 @Composable
 private fun DrawingEditorCard(
-    settings: TrioSettings,
-    update: ((SettingsRepository) -> Unit) -> Unit,
+    baseSettings: TrioSettings,
+    dispatch: ((SettingsRepository) -> Unit) -> Unit,
     onEditColor: (RoleColor) -> Unit,
     onResetColors: () -> Unit,
     snapshotForStyle: (Int) -> TrioSettings,
@@ -281,6 +296,16 @@ private fun DrawingEditorCard(
     var scene by rememberSaveable { mutableStateOf(PreviewScene.Normal) }
     var previewTheme by rememberSaveable { mutableStateOf(0) }
     var lastSelection by remember { mutableStateOf<ZoneSelection?>(null) }
+
+    // A charging tab edits that scene's own arrangement; [baseSettings] is the idle one.
+    // Everything below - the preview, the zone board, the switches - reads the scoped
+    // snapshot, so the glyph shows exactly what the status bar will draw in that state.
+    val settings = ChargeLayout.forScene(baseSettings, scene.chargeScene)
+    // Writes follow the same scene. The repository is scoped per call, so no caller has to
+    // say which arrangement it is touching; the inspector and the tabs stay in agreement.
+    val update: ((SettingsRepository) -> Unit) -> Unit = { block ->
+        dispatch { repo -> block(repo.forChargeScene(scene.chargeScene)) }
+    }
 
     val appearance = TrioAppearance.of(settings)
     val systemDark = androidx.compose.foundation.isSystemInDarkTheme()

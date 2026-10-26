@@ -13,8 +13,10 @@ package io.github.yixing233.hyperduo.ui
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.os.Bundle
 import android.util.Log
 import androidx.core.content.edit
+import io.github.yixing233.hyperduo.ChargeLayout
 import io.github.yixing233.hyperduo.HyperDuoApp
 import io.github.yixing233.hyperduo.Prefs
 import io.github.yixing233.hyperduo.TrioSettings
@@ -38,10 +40,20 @@ import io.github.libxposed.service.XposedService
  * write is pushed, otherwise a value the user changes while the service is
  * bound would never reach SystemUI.
  */
-class SettingsRepository(context: Context) {
+class SettingsRepository(context: Context, private val chargeScene: Int = ChargeLayout.BASE) {
 
     private val appContext = context.applicationContext
     private val service: XposedService? get() = HyperDuoApp.xposedService
+
+    /**
+     * The same store, read and written through the arrangement of [scene].
+     *
+     * <p>The drawing page hands this to its editor while a charging tab is selected, so
+     * every read shows that scene's arrangement and every write lands in its key without
+     * the callers having to know which scene they are in.
+     */
+    fun forChargeScene(scene: Int): SettingsRepository =
+        if (scene == chargeScene) this else SettingsRepository(appContext, scene)
 
     /** The display density, needed to migrate the retired raw-pixel size key. */
     private val density: Float
@@ -51,7 +63,8 @@ class SettingsRepository(context: Context) {
         appContext.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
 
     /** The current values, as the preview should render them. */
-    fun read(): TrioSettings = TrioSettings.from(preferences(), density)
+    fun read(): TrioSettings =
+        ChargeLayout.forScene(TrioSettings.from(preferences(), density), chargeScene)
 
     /**
      * The snapshot for a style the user is <em>not</em> currently in.
@@ -64,32 +77,26 @@ class SettingsRepository(context: Context) {
      * nothing observes a transient state and no write is pushed to the hooked process.
      */
     fun readForStyle(style: Int): TrioSettings =
-        TrioSettings.from(preferences(), density, Prefs.normalizeTrioStyle(style))
+        ChargeLayout.forScene(
+            TrioSettings.from(preferences(), density, Prefs.normalizeTrioStyle(style)),
+            chargeScene,
+        )
 
     // ------------------------------------------------------------- appearance
 
     fun setEnabled(value: Boolean) = writeBoolean(Prefs.KEY_ENABLED, value)
-    fun setShowWifi(value: Boolean) = writeStyled(style(), Prefs.KEY_SHOW_WIFI) { e, k ->
-        e.putBoolean(k, value) }
-    fun setShowMobile(value: Boolean) = writeStyled(style(), Prefs.KEY_SHOW_MOBILE) { e, k ->
-        e.putBoolean(k, value) }
-    fun setShowValue(value: Boolean) = writeStyled(style(), Prefs.KEY_SHOW_VALUE) { e, k ->
-        e.putBoolean(k, value) }
-    fun setShowBolt(value: Boolean) = writeStyled(style(), Prefs.KEY_SHOW_BOLT) { e, k ->
-        e.putBoolean(k, value) }
-    fun setDualSim(value: Boolean) = writeStyled(style(), Prefs.KEY_DUAL_SIM) { e, k ->
-        e.putBoolean(k, value) }
+    fun setShowWifi(value: Boolean) = writeComponent(Prefs.KEY_SHOW_WIFI, value)
+    fun setShowMobile(value: Boolean) = writeComponent(Prefs.KEY_SHOW_MOBILE, value)
+    fun setShowValue(value: Boolean) = writeComponent(Prefs.KEY_SHOW_VALUE, value)
+    fun setShowBolt(value: Boolean) = writeComponent(Prefs.KEY_SHOW_BOLT, value)
+    fun setDualSim(value: Boolean) = writeComponent(Prefs.KEY_DUAL_SIM, value)
     /** SIM 1's own row of dots, placed as a component - see [Prefs.KEY_SHOW_SIM_1]. */
-    fun setShowSim1(value: Boolean) = writeStyled(style(), Prefs.KEY_SHOW_SIM_1) { e, k ->
-        e.putBoolean(k, value) }
+    fun setShowSim1(value: Boolean) = writeComponent(Prefs.KEY_SHOW_SIM_1, value)
     /** SIM 2's own row of dots, placed as a component - see [Prefs.KEY_SHOW_SIM_2]. */
-    fun setShowSim2(value: Boolean) = writeStyled(style(), Prefs.KEY_SHOW_SIM_2) { e, k ->
-        e.putBoolean(k, value) }
-    fun setValueCentred(value: Boolean) = writeStyled(style(), Prefs.KEY_VALUE_CENTRED) { e, k ->
-        e.putBoolean(k, value) }
+    fun setShowSim2(value: Boolean) = writeComponent(Prefs.KEY_SHOW_SIM_2, value)
+    fun setValueCentred(value: Boolean) = writeComponent(Prefs.KEY_VALUE_CENTRED, value)
     /** 0 = hidden, 1 = inside the ring, 2 = outside it. */
-    fun setMobileTypeMode(value: Int) = writeStyled(style(), Prefs.KEY_MOBILE_TYPE_MODE) { e, k ->
-        e.putInt(k, value) }
+    fun setMobileTypeMode(value: Int) = writeComponent(Prefs.KEY_MOBILE_TYPE_MODE, value)
     /** Stored IDs stay 0 = ring and 2 = capsule; retired ID 1 returns to the ring. */
     fun setTrioStyle(value: Int) = writeInt(Prefs.KEY_TRIO_STYLE, Prefs.normalizeTrioStyle(value))
 
@@ -124,12 +131,68 @@ class SettingsRepository(context: Context) {
         notifyModule()
     }
 
+    /**
+     * Writes one component switch.
+     *
+     * <p>Inside a charging scene the switch belongs to that scene's arrangement, not to the
+     * idle glyph: switching the percentage on for charging must not also switch it on at
+     * 40 % on the desk. The whole arrangement is re-encoded in that case, which is what
+     * keeps a scene self-contained when the idle layout changes later.
+     */
+    private fun writeComponent(base: String, value: Any) {
+        if (chargeScene != ChargeLayout.BASE) {
+            val next = read().copy()
+            when (base) {
+                Prefs.KEY_SHOW_WIFI -> next.showWifi = value as Boolean
+                Prefs.KEY_SHOW_MOBILE -> next.showMobile = value as Boolean
+                Prefs.KEY_SHOW_VALUE -> next.showValue = value as Boolean
+                Prefs.KEY_SHOW_BOLT -> next.showBolt = value as Boolean
+                Prefs.KEY_DUAL_SIM -> next.dualSim = value as Boolean
+                Prefs.KEY_SHOW_SIM_1 -> next.showSim1 = value as Boolean
+                Prefs.KEY_SHOW_SIM_2 -> next.showSim2 = value as Boolean
+                Prefs.KEY_VALUE_CENTRED -> next.valueCentred = value as Boolean
+                Prefs.KEY_MOBILE_TYPE_MODE -> next.mobileTypeMode = value as Int
+                else -> return
+            }
+            applyRingAssignment(next, layoutEdit = false)
+            return
+        }
+        val style = style()
+        val key = Prefs.styledKey(base, style)
+        preferences().edit(commit = true) {
+            when (value) {
+                is Boolean -> putBoolean(key, value)
+                is Int -> putInt(key, value)
+            }
+        }
+        push {
+            when (value) {
+                is Boolean -> it.putBoolean(key, value)
+                is Int -> it.putInt(key, value)
+            }
+        }
+        notifyModule()
+    }
+
     /** Publish one layout edit as a single local/remote transaction and one broadcast. */
-    fun applyRingAssignment(next: TrioSettings) {
+    fun applyRingAssignment(next: TrioSettings, layoutEdit: Boolean = true) {
+        val style = Prefs.normalizeTrioStyle(next.trioStyle)
+        val scene = chargeScene
+        if (scene != ChargeLayout.BASE) {
+            val snapshot = next.copy()
+            // An explicit placement replaces the legacy "centre shows percentage" override,
+            // exactly as the 16 branch behaves. A mere switch toggle leaves it alone.
+            if (layoutEdit) snapshot.chargingShowsValue = false
+            val key = Prefs.styledKey(ChargeLayout.key(scene), style)
+            val encoded = ChargeLayout.encode(snapshot)
+            preferences().edit(commit = true) { putString(key, encoded) }
+            push { it.putString(key, encoded) }
+            notifyModule()
+            return
+        }
         // The arrangement being written is the snapshot's own, not the stored one: the caller
         // built `next` for a specific style, and a layout written under the wrong key would
         // show up in the other arrangement on the next style switch.
-        val style = Prefs.normalizeTrioStyle(next.trioStyle)
         val write: (SharedPreferences.Editor) -> Unit = { e ->
             e.putString(Prefs.styledKey(Prefs.KEY_RING_LAYOUT, style),
                 Prefs.encodeLayout(next.ringZones))
@@ -156,7 +219,7 @@ class SettingsRepository(context: Context) {
      * the mapping is kept - the ring's editor drives the priority lists directly.
      */
     fun setRingPartPosition(part: io.github.yixing233.hyperduo.TrioZones.Part, position: Int) {
-        val current = TrioSettings.from(preferences(), density)
+        val current = read()
         // The choices a caller can pass are the arrangement's own cells, in the order
         // the dropdown lists them. The capsule lists four (top, left, right, bottom)
         // and the ring three, so the mapping from "choice number" to "zone" is read
@@ -209,7 +272,7 @@ class SettingsRepository(context: Context) {
      * bottom band.
      */
     fun setWifiPosition(position: Int) {
-        val current = TrioSettings.from(preferences(), density)
+        val current = read()
         val slots = if (current.trioStyle == Prefs.STYLE_CAPSULE) {
             listOf(io.github.yixing233.hyperduo.TrioZones.Zone.TOP,
                 io.github.yixing233.hyperduo.TrioZones.Zone.LEFT,
@@ -400,6 +463,16 @@ class SettingsRepository(context: Context) {
             prefs.putInt(Prefs.KEY_NAV_LABELS, snapshot.navLabels)
             prefs.putString(Prefs.styledKey(Prefs.KEY_RING_LAYOUT, style),
                 Prefs.encodeLayout(snapshot.ringZones))
+            // A reconnect must not drop the charging arrangements: an empty value is
+            // meaningful ("inherit the idle layout"), so only non-empty ones are replayed.
+            if (snapshot.chargingLayout.isNotEmpty()) {
+                prefs.putString(Prefs.styledKey(Prefs.KEY_CHARGING_LAYOUT, style),
+                    snapshot.chargingLayout)
+            }
+            if (snapshot.quickChargingLayout.isNotEmpty()) {
+                prefs.putString(Prefs.styledKey(Prefs.KEY_QUICK_CHARGING_LAYOUT, style),
+                    snapshot.quickChargingLayout)
+            }
             prefs.putBoolean(Prefs.KEY_DATA_SIM_ONLY, snapshot.dataSimOnly)
             prefs.putBoolean(Prefs.KEY_PERF_POWER, snapshot.perfPower)
                 prefs.putBoolean(Prefs.KEY_PERF_TEMP, snapshot.perfTemp)

@@ -601,7 +601,10 @@ final class ColorOsHooks {
             }
             if (!active) capture();
             active = true;
-            TrioAppearance appearance = TrioConfig.appearance();
+            // The arrangement may differ per charging scene, so the host has to reserve
+            // the space of the arrangement it is about to draw, not of the idle one.
+            TrioAppearance appearance = TrioAppearance.of(ChargeLayout.forState(
+                    TrioConfig.get(), state.charging, state.quickCharging));
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(nativeParams);
             int height = Math.round(20 * meter.getResources().getDisplayMetrics().density);
             TrioGeometry.setCapsuleLength(appearance.capsuleLength);
@@ -901,7 +904,8 @@ final class ColorOsHooks {
                 canvas.translate(getBounds().left, getBounds().top);
                 canvas.clipRect(0, 0, getBounds().width(), getBounds().height());
                 TrioRenderer.drawState(canvas, getBounds().width(), getBounds().height(),
-                        host.state, TrioConfig.get());
+                        host.state, ChargeLayout.forState(TrioConfig.get(),
+                                host.state.charging, host.state.quickCharging));
             } catch (Throwable error) {
                 host.failed = true;
                 MAIN.post(() -> host.fail(error));

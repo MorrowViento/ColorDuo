@@ -63,7 +63,75 @@ public final class ColorOsSettingsTest {
             if ((image.getRGB(x, y) >>> 24) != 0) ink++;
         }
         check(ink > 1000, "configured upstream dual-card ring paints visible artwork");
+
+        // Charging scenes keep an arrangement of their own; an absent scene inherits the
+        // live one, and a malformed stored value must never replace a working layout.
+        TrioSettings charging = dual.copy();
+        charging.ringZones = Prefs.decodeLayout("4,1|3|7|");
+        String encodedCharge = ChargeLayout.encode(charging);
+        check(ChargeLayout.normalize(encodedCharge).equals(encodedCharge),
+                "charging arrangement round-trips through the encoder");
+        check(ChargeLayout.normalize("").isEmpty(), "missing scene inherits the normal arrangement");
+        check(ChargeLayout.normalize("broken").isEmpty(), "malformed scene falls back to inheritance");
+        check(ChargeLayout.normalize("1;99999;0;0;|||").isEmpty(), "out-of-range flags are rejected");
+        check(ChargeLayout.normalize("1;4;9;0;|||").isEmpty(), "unknown network-type mode is rejected");
+
+        TrioSettings withCharge = dual.copy();
+        withCharge.chargingLayout = encodedCharge;
+        TrioSettings drawCharge = ChargeLayout.forState(withCharge, true, false);
+        check(Arrays.deepEquals(drawCharge.ringZones, charging.ringZones),
+                "charging scene draws its own arrangement");
+        check(ChargeLayout.forState(withCharge, false, false) == withCharge,
+                "idle scene keeps the live snapshot untouched");
+
+        // Fast charging is a third arrangement, not a synonym for ordinary charging.
+        TrioSettings quickSource = dual.copy();
+        quickSource.ringZones = Prefs.decodeLayout("4,5|1|7|");
+        TrioSettings withQuick = withCharge.copy();
+        withQuick.quickChargingLayout = ChargeLayout.encode(quickSource);
+        check(Arrays.deepEquals(ChargeLayout.forState(withQuick, true, true).ringZones,
+                        quickSource.ringZones),
+                "fast charging draws its own arrangement");
+        check(!Arrays.deepEquals(ChargeLayout.forState(withQuick, true, true).ringZones,
+                        drawCharge.ringZones),
+                "fast charging differs from ordinary charging");
+
+        check(TrioSettings.fromBundle(withCharge.toBundle()).chargingLayout
+                        .equals(withCharge.chargingLayout),
+                "charging arrangement survives settings transport");
+
+        // And the arrangement reaches the renderer: at one identical battery state, the idle
+        // and fast-charging arrangements must not paint the same frame. This is the end of the
+        // chain the settings tests otherwise stop short of.
+        BufferedImage idleFrame = renderGlyph(withQuick, true, true);
+        BufferedImage fastFrame = renderGlyph(ChargeLayout.forState(withQuick, true, true), true, true);
+        check(differingPixels(idleFrame, fastFrame) > 100,
+                "the fast-charging arrangement changes the rendered frame");
+
         System.out.println("Upstream defaults, settings transport, dual-card selection and ring rendering passed");
+    }
+
+    /** One glyph frame at a fixed state, for comparing two arrangements. */
+    private static BufferedImage renderGlyph(TrioSettings cfg, boolean charging, boolean quick) {
+        BufferedImage image = new BufferedImage(240, 200, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics = image.createGraphics();
+        try {
+            TrioRenderer.drawInto(new Canvas(graphics), 240, 200, 65, charging, quick,
+                    false, false, 4, 4, new int[] {4, 2}, "5G", 0xFFFFFFFF, cfg, true, true);
+        } finally {
+            graphics.dispose();
+        }
+        return image;
+    }
+
+    private static int differingPixels(BufferedImage a, BufferedImage b) {
+        int count = 0;
+        for (int y = 0; y < a.getHeight(); y++) {
+            for (int x = 0; x < a.getWidth(); x++) {
+                if (a.getRGB(x, y) != b.getRGB(x, y)) count++;
+            }
+        }
+        return count;
     }
 
     private static void check(boolean value, String message) {
