@@ -331,4 +331,10 @@
     <string name="about_diagnostics_summary">复制当前配置和设备信息，粘贴到问题反馈里。</string>
     <string name="about_diagnostics_copy">复制诊断信息</string>
     <string name="about_diagnostics_copied">已复制到剪贴板</string>
+    <!-- Charging tabs: whether this state owns a layout or follows the normal one. -->
+    <string name="drawing_scene_custom">此页签：自定义布局</string>
+    <string name="drawing_scene_inherited">此页签：沿用普通布局</string>
+    <string name="drawing_scene_inherit">改用普通布局</string>
+    <string name="drawing_scene_inherit_summary">删除这个页签的独立布局，之后跟随普通布局的变化。</string>
+    <string name="drawing_scene_inherit_confirm">沿用</string>
 </resources>
