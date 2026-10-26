@@ -72,15 +72,23 @@ public final class ColorOsHostTest {
         void setScaleType(ScaleType value){scale=value;}
     }
     static class Glyph extends Drawable { void invalidateSelf(){} }
-    static class State { int level=65,wifiLevel=3;boolean wifiPresent=true; }
-    static class Config { boolean enabled=true; }
+    static class State { int level=65,wifiLevel=3;boolean wifiPresent=true;
+        boolean charging,quickCharging; }
+    static class TrioSettings { boolean enabled=true; }
     static class TrioConfig {
-        static Config config=new Config();
+        static TrioSettings config=new TrioSettings();
         static TrioAppearance appearance=new TrioAppearance();
-        static Config get(){return config;}
+        static TrioSettings get(){return config;}
         static TrioAppearance appearance(){return appearance;}
     }
+    /** The real one decodes an arrangement; this fixture only cares about host lifecycle. */
+    static class ChargeLayout {
+        static TrioSettings forState(TrioSettings base,boolean charging,boolean quick){
+            return base;
+        }
+    }
     static class TrioAppearance {
+        static TrioAppearance of(TrioSettings settings){return TrioConfig.appearance;}
         boolean capsule;
         int capsuleLength=100;
         boolean handsBackPercentage(){return false;}
