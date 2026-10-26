@@ -72,6 +72,7 @@ public final class DiagnosticsReport {
         out.append("charging=").append(scene(settings.chargingLayout)).append('\n');
         out.append("quick=").append(scene(settings.quickChargingLayout)).append('\n');
         out.append("debug=").append(settings.debugLog ? "on" : "off").append('\n');
+        out.append("dual=").append(settings.dualRow ? "on" : "off").append('\n');
         return out.toString();
     }
 
