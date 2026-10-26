@@ -103,6 +103,15 @@ public final class ColorOsSettingsTest {
                         .equals(withCharge.chargingLayout),
                 "charging arrangement survives settings transport");
 
+        // Each style/scene pair must map to its own storage key: a shared key would let a
+        // capsule edit surface in the ring, or make fast charging overwrite ordinary charging.
+        check(!Prefs.styledKey(ChargeLayout.key(ChargeLayout.CHARGING), Prefs.STYLE_RING)
+                        .equals(Prefs.styledKey(ChargeLayout.key(ChargeLayout.CHARGING),
+                                Prefs.STYLE_CAPSULE)),
+                "the charging key is per style");
+        check(!ChargeLayout.key(ChargeLayout.CHARGING).equals(ChargeLayout.key(ChargeLayout.QUICK)),
+                "fast charging has its own key");
+
         // And the arrangement reaches the renderer: at one identical battery state, the idle
         // and fast-charging arrangements must not paint the same frame. This is the end of the
         // chain the settings tests otherwise stop short of.
