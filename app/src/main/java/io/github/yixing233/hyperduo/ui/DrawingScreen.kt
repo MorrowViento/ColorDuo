@@ -286,6 +286,8 @@ private fun DrawingEditorCard(
     var sheetVisible by remember(editing) { mutableStateOf(editing != null) }
     var pendingColor by remember { mutableStateOf<RoleColor?>(null) }
     var pendingReset by remember { mutableStateOf(false) }
+    // The recommendation replaces every placement at once, so it asks before doing it.
+    var confirmingRecommended by remember { mutableStateOf(false) }
     // The zone whose picker is open, if any. One at a time: the picker is a dialog,
     // and two stacked pickers would be a state with no sensible dismissal order.
     var picking by remember { mutableStateOf<TrioZones.Zone?>(null) }
@@ -373,6 +375,11 @@ private fun DrawingEditorCard(
                 selected = scene,
                 onSelect = { scene = it },
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+            )
+            TextButton(
+                text = stringResource(R.string.drawing_restore_recommended),
+                onClick = { confirmingRecommended = true },
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             )
             LazyRow(
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
@@ -617,6 +624,36 @@ private fun DrawingEditorCard(
                 }
             },
         )
+    }
+
+    if (confirmingRecommended) {
+        OverlayDialog(
+            show = true,
+            title = stringResource(R.string.drawing_restore_recommended),
+            summary = stringResource(R.string.drawing_restore_recommended_summary),
+            onDismissRequest = { confirmingRecommended = false },
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                TextButton(
+                    text = stringResource(R.string.cancel),
+                    onClick = { confirmingRecommended = false },
+                    modifier = Modifier.weight(1f),
+                )
+                Button(
+                    onClick = {
+                        confirmingRecommended = false
+                        update { it.applyRecommendedLayout() }
+                    },
+                    colors = ButtonDefaults.buttonColorsPrimary(),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(text = stringResource(R.string.drawing_restore_recommended_confirm))
+                }
+            }
+        }
     }
 }
 

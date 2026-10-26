@@ -323,4 +323,8 @@
     <string name="font_applied">Applied %1$s</string>
     <string name="font_not_a_font">That file is not a font (only .ttf / .otf), ignored</string>
     <string name="font_failed">Could not install the font, please try again</string>
+    <!-- One-click profile on the drawing page; replaces placement, keeps the look. -->
+    <string name="drawing_restore_recommended">Restore recommended layout</string>
+    <string name="drawing_restore_recommended_summary">Put this style\'s pieces back to the recommended arrangement. Colours and sizes are kept.</string>
+    <string name="drawing_restore_recommended_confirm">Restore</string>
 </resources>

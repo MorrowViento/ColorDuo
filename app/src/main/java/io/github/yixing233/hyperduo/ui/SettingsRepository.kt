@@ -19,6 +19,7 @@ import androidx.core.content.edit
 import io.github.yixing233.hyperduo.ChargeLayout
 import io.github.yixing233.hyperduo.HyperDuoApp
 import io.github.yixing233.hyperduo.Prefs
+import io.github.yixing233.hyperduo.RecommendedLayout
 import io.github.yixing233.hyperduo.TrioSettings
 import io.github.libxposed.service.XposedService
 
@@ -207,6 +208,31 @@ class SettingsRepository(context: Context, private val chargeScene: Int = Charge
         val editor = preferences().edit()
         write(editor)
         editor.commit()
+        push(write)
+        notifyModule()
+    }
+
+    /**
+     * Replaces this style's arrangement with the shipped recommendation.
+     *
+     * <p>Explicit rather than automatic: a fresh install stays empty (upstream's choice),
+     * and an existing arrangement is only replaced after the user confirms the dialog.
+     * Appearance values are untouched, so colours and sizes survive.
+     */
+    fun applyRecommendedLayout() {
+        val next = RecommendedLayout.of(read())
+        applyRingAssignment(next)
+        writeArrangement(ChargeLayout.CHARGING, next.chargingLayout)
+        writeArrangement(ChargeLayout.QUICK, next.quickChargingLayout)
+    }
+
+    /** Writes one scene's encoded arrangement, removing the key when it means "inherit". */
+    private fun writeArrangement(scene: Int, encoded: String) {
+        val key = Prefs.styledKey(ChargeLayout.key(scene), style())
+        val write: (SharedPreferences.Editor) -> Unit = { e ->
+            if (encoded.isEmpty()) e.remove(key) else e.putString(key, encoded)
+        }
+        preferences().edit(commit = true) { write(this) }
         push(write)
         notifyModule()
     }
