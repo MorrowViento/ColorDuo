@@ -106,7 +106,7 @@ internal fun ContentControlRow(
     val a = TrioAppearance.of(settings)
     val master = listOf(a.glyph to R.string.master_title)
     val positioned = when (control) {
-        ContentControl.Value -> TrioZones.Part.VALUE
+        ContentControl.Value -> TrioZones.Part.VALUE
         // Not a position row: it is a lens over the centre, not a place for the number.
         ContentControl.ChargingShowsValue -> null
         ContentControl.Bolt -> TrioZones.Part.BOLT
@@ -144,6 +144,20 @@ internal fun ContentControlRow(
     }
     if (control == ContentControl.Sim2 && a.slotted) {
         SignalCardPositionControl(TrioZones.Part.SIM_2, settings, update, enabled = signalInsideRing(a))
+    }
+    // Prototype: the two cards' rows drawn as one, in the zone that holds SIM 1. Offered in
+    // both cards' sheets - the card that happens to be first in the zone is the one a user
+    // opens, and hiding the switch behind the other one made it look absent. Ring only for
+    // now: the capsule's band is too short to judge without a device.
+    if ((control == ContentControl.Sim1 || control == ContentControl.Sim2)
+            && a.slotted && a.ring) {
+        ContentToggle(
+            checked = a.dualRow,
+            title = R.string.dual_row_title,
+            summaryRes = R.string.dual_row_summary,
+            dependencies = master + (a.mobile to R.string.show_mobile_title) +
+                (signalInsideRing(a) to R.string.ring_position_mobile),
+        ) { value -> update { it.setDualRow(value) } }
     }
     when (control) {
         ContentControl.Enabled -> ContentToggle(settings.enabled, R.string.master_title,

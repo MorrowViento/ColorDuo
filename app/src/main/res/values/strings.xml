@@ -341,4 +341,7 @@
     <string name="about_diagnostics_live">读取实时状态</string>
     <string name="about_diagnostics_live_ok">通道正常：%1$s</string>
     <string name="about_diagnostics_live_timeout">系统界面没有响应，重启系统界面后再试</string>
+    <!-- Prototype: draw both SIM cards' level rows in one zone. -->
+    <string name="dual_row_title">合并双卡信号</string>
+    <string name="dual_row_summary">在卡一所在的区域同时画出两张卡：卡一四个点、留空、卡二四个点，卡二那一行不再单独显示。目前只对圆环样式生效。</string>
 </resources>

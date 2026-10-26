@@ -120,6 +120,18 @@ public final class ColorOsSettingsTest {
         check(differingPixels(idleFrame, fastFrame) > 100,
                 "the fast-charging arrangement changes the rendered frame");
 
+        // The merged dual row: the switch has to reach both the snapshot and the appearance,
+        // and it has to change what the same placement paints.
+        TrioSettings merged = dual.copy();
+        merged.dualRow = true;
+        check(TrioSettings.fromBundle(merged.toBundle()).dualRow,
+                "the merged-row switch survives transport");
+        check(TrioAppearance.of(merged).dualRow, "the renderer sees the merged-row switch");
+        BufferedImage singleRow = renderGlyph(dual, true, false);
+        BufferedImage mergedRow = renderGlyph(merged, true, false);
+        check(differingPixels(singleRow, mergedRow) > 50,
+                "merging the two cards' rows changes the rendered frame");
+
         // The two styles keep separate charging screens: the capsule's copy lives under the
         // @capsule suffix and must not be read as the ring's.
         Map<String, Object> stored = new HashMap<>();

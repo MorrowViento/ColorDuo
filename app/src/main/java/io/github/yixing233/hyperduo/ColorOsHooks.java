@@ -562,6 +562,8 @@ final class ColorOsHooks {
         boolean active;
         boolean failed;
         boolean logged;
+        /** Counted once per host: apply() runs on every layout pass, not once per host. */
+        boolean reported;
         boolean moduleWriting;
         int ownedWidth;
         int ownedHeight;
@@ -654,7 +656,10 @@ final class ColorOsHooks {
                 TrioHooks.log(TrioHooks.LOG_INFO,
                         HookReport.render(wifiFlow != null, MOBILES.size()));
             }
-            HookReport.hostApplied();
+            if (!reported) {
+                reported = true;
+                HookReport.hostApplied();
+            }
             // The arrangement may differ per charging scene, so the host has to reserve
             // the space of the arrangement it is about to draw, not of the idle one.
             TrioAppearance appearance = TrioAppearance.of(ChargeLayout.forState(

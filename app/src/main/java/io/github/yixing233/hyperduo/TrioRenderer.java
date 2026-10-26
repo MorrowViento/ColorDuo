@@ -483,9 +483,16 @@ final class TrioRenderer {
                 // The user's size multiplies the reference bead; the opening's room still
                 // caps it, so a large setting stops growing rather than overrunning the
                 // arc's caps. See TrioGeometry.arcRowDotR's four-argument form.
-                drawArcDotRow(c, active, z,
-                        TrioGeometry.arcRowDotR(z, a.ringStroke, width, a.dotScaleFactor()),
-                        fg, a);
+                final float radius =
+                        TrioGeometry.arcRowDotR(z, a.ringStroke, width, a.dotScaleFactor());
+                if (a.dualRow && part == Prefs.PART_SIM_1) {
+                    // Both cards in one row: SIM 1's four beads, a gap, SIM 2's four.
+                    final int sim1 = levels == null ? -1 : levels[0];
+                    final int sim2 = levels == null ? -1 : levels[1];
+                    drawDualDotRow(c, sim1, sim2, z, radius, fg, a);
+                } else {
+                    drawArcDotRow(c, active, z, radius, fg, a);
+                }
             } else {
                 final String text = part == Prefs.PART_VALUE ? String.valueOf(level)
                         : part == Prefs.PART_TYPE ? type : TrioState.sClockText;
@@ -631,6 +638,69 @@ final class TrioRenderer {
             c.drawCircle(ringX - TrioGeometry.B_CX,
                     ringY - TrioGeometry.ZONE_CY[zone], radius, FILL);
         }
+    }
+
+    /**
+     * Both cards' level rows in one band, one layer each: SIM 1 on the row the glyph has
+     * always had, SIM 2 on a second row just inside it.
+     *
+     * <p>Eight beads in the four beads' span had to shrink to half size to stop touching,
+     * which read as a dotted smear on the device. Two layers keep the normal bead size: the
+     * outer row is unchanged, and the inner one is a straight chord rather than an arc -
+     * the same angles at a smaller radius halve the spacing between beads, a chord does not.
+     * Both layers sit clear of the centre reading.
+     */
+    private static void drawDualDotRow(Canvas c, int sim1, int sim2, int zone, float radius,
+                                       int fg, TrioAppearance a) {
+        final int inactive = withAlpha(fg, a.trackAlpha);
+        final int[] levels = {clampLevel(sim1), clampLevel(sim2)};
+        // Two rows at the normal bead size rather than eight shrunken ones: SIM 1 keeps the
+        // row the glyph has always had, SIM 2 sits one bead-gap inside it. The spacing of
+        // the outer row is deliberately generous (a third of the opening per bead), so the
+        // inner row keeps the same angles and still has room between its beads.
+        final float layerGap = radius * 3.1f;
+        if (zone == 1) {
+            final float step = radius * 3f;
+            for (int layer = 0; layer < 2; layer++) {
+                final float y = -layer * layerGap;
+                for (int dot = 0; dot < 4; dot++) {
+                    FILL.setColor(dot < levels[layer] ? fg : inactive);
+                    c.drawCircle((dot - 1.5f) * step, y, radius, FILL);
+                }
+            }
+            return;
+        }
+        final float openingRad = (float) Math.toRadians(TrioGeometry.GAP_WIDTH_DEG);
+        final float inset = (radius + a.ringStroke * 0.5f + 1f) / TrioGeometry.B_R;
+        final float halfAngle = Math.max(0f, openingRad * 0.5f - inset);
+        final float beadHalfAngle = (float) Math.toRadians(TrioGeometry.BEAD_SPAN_DEG * 0.5f);
+        final float halfCentreAngle = Math.min(halfAngle, beadHalfAngle);
+        final float sign = zone == 2 ? 1f : -1f;
+        // Outer layer: the row the glyph has always had, on the opening itself.
+        for (int dot = 0; dot < 4; dot++) {
+            final float t = (dot - 1.5f) / 1.5f;
+            final float angle = t * halfCentreAngle;
+            final float ringX = TrioGeometry.B_CX + TrioGeometry.B_R * (float) Math.sin(angle);
+            final float ringY = TrioGeometry.B_CY + sign * TrioGeometry.B_R * (float) Math.cos(angle);
+            FILL.setColor(dot < levels[0] ? fg : inactive);
+            c.drawCircle(ringX - TrioGeometry.B_CX, ringY - TrioGeometry.ZONE_CY[zone], radius, FILL);
+        }
+        // Inner layer: a straight chord. The same angles at a smaller radius would halve the
+        // spacing between beads and make them overlap; a chord keeps the spacing and stays
+        // below the centre reading.
+        final float innerRadius = radius * 0.85f;
+        final float innerStep = innerRadius * 3.0f;
+        final float innerY = TrioGeometry.B_CY + sign * (TrioGeometry.B_R - layerGap)
+                - TrioGeometry.ZONE_CY[zone];
+        for (int dot = 0; dot < 4; dot++) {
+            FILL.setColor(dot < levels[1] ? fg : inactive);
+            c.drawCircle((dot - 1.5f) * innerStep, innerY, innerRadius, FILL);
+        }
+    }
+
+    /** A reading outside 0..4 (including "no reading") contributes no lit beads. */
+    private static int clampLevel(int level) {
+        return level < 0 ? 0 : Math.min(4, level);
     }
 
     /**

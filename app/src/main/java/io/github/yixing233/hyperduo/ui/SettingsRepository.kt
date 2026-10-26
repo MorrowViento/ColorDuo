@@ -86,6 +86,8 @@ class SettingsRepository(context: Context, private val chargeScene: Int = Charge
     // ------------------------------------------------------------- appearance
 
     fun setEnabled(value: Boolean) = writeBoolean(Prefs.KEY_ENABLED, value)
+    /** Merges the two cards' rows into the zone that holds SIM 1; see [Prefs.KEY_DUAL_ROW]. */
+    fun setDualRow(value: Boolean) = writeBoolean(Prefs.KEY_DUAL_ROW, value)
     fun setShowWifi(value: Boolean) = writeComponent(Prefs.KEY_SHOW_WIFI, value)
     fun setShowMobile(value: Boolean) = writeComponent(Prefs.KEY_SHOW_MOBILE, value)
     fun setShowValue(value: Boolean) = writeComponent(Prefs.KEY_SHOW_VALUE, value)

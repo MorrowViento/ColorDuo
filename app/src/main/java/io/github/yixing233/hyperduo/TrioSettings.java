@@ -118,6 +118,14 @@ public final class TrioSettings {
      */
     public boolean stackedSignal;
     /**
+     * Draws both cards' level rows in the zone that holds SIM 1, four beads each with a gap
+     * between the groups; SIM 2's own row is suppressed while this is on.
+     *
+     * <p>Global rather than per-arrangement: the choice is about legibility, not about a
+     * particular look, and two arrangements disagreeing about it would be confusing.
+     */
+    public boolean dualRow;
+    /**
      * Draws SIM 1's own row of four dots, as a placed component.
      *
      * <p>Independent of {@link #dualSim} and of {@link #showSim2}: the dual
@@ -323,6 +331,7 @@ public final class TrioSettings {
         s.dualSim = Prefs.DEF_DUAL_SIM;
         s.signalMode = Prefs.DEF_SIGNAL_MODE;
         s.stackedSignal = Prefs.DEF_STACKED_SIGNAL;
+        s.dualRow = Prefs.DEF_DUAL_ROW;
         s.showSim1 = Prefs.DEF_SHOW_SIM_1;
         s.showSim2 = Prefs.DEF_SHOW_SIM_2;
         s.dataSimOnly = Prefs.DEF_DATA_SIM_ONLY;
@@ -446,6 +455,7 @@ public final class TrioSettings {
         s.signalMode = Prefs.clamp(
                 readStyledInt(p, Prefs.KEY_SIGNAL_MODE, Prefs.DEF_SIGNAL_MODE, s.trioStyle),
                 Prefs.MIN_SIGNAL_MODE, Prefs.MAX_SIGNAL_MODE);
+        s.dualRow = p.getBoolean(Prefs.KEY_DUAL_ROW, Prefs.DEF_DUAL_ROW);
         s.stackedSignal = readStyledBoolean(p, Prefs.KEY_STACKED_SIGNAL,
                 Prefs.DEF_STACKED_SIGNAL, s.trioStyle);
         s.showSim1 = readStyledBoolean(p, Prefs.KEY_SHOW_SIM_1, Prefs.DEF_SHOW_SIM_1,
@@ -787,6 +797,7 @@ public final class TrioSettings {
         s.dualSim = other.dualSim;
         s.signalMode = other.signalMode;
         s.stackedSignal = other.stackedSignal;
+        s.dualRow = other.dualRow;
         s.ringZones = copyZones(other.ringZones);
         return s;
     }
@@ -855,6 +866,7 @@ public final class TrioSettings {
         s.dualSim = dualSim;
         s.signalMode = signalMode;
         s.stackedSignal = stackedSignal;
+        s.dualRow = dualRow;
         s.showSim1 = showSim1;
         s.showSim2 = showSim2;
         s.dataSimOnly = dataSimOnly;
@@ -950,6 +962,7 @@ public final class TrioSettings {
             case Prefs.KEY_DUAL_SIM: dualSim = src.dualSim; return true;
             case Prefs.KEY_SIGNAL_MODE: signalMode = src.signalMode; return true;
             case Prefs.KEY_STACKED_SIGNAL: stackedSignal = src.stackedSignal; return true;
+            case Prefs.KEY_DUAL_ROW: dualRow = src.dualRow; return true;
             case Prefs.KEY_SHOW_SIM_1: showSim1 = src.showSim1; return true;
             case Prefs.KEY_SHOW_SIM_2: showSim2 = src.showSim2; return true;
             case Prefs.KEY_DATA_SIM_ONLY: dataSimOnly = src.dataSimOnly; return true;
@@ -1043,6 +1056,7 @@ public final class TrioSettings {
         s.signalMode = Prefs.clamp(
                 readStyledInt(bundle, Prefs.KEY_SIGNAL_MODE, Prefs.DEF_SIGNAL_MODE, s.trioStyle),
                 Prefs.MIN_SIGNAL_MODE, Prefs.MAX_SIGNAL_MODE);
+        s.dualRow = bundle.getBoolean(Prefs.KEY_DUAL_ROW, Prefs.DEF_DUAL_ROW);
         s.stackedSignal = readStyledBoolean(bundle, Prefs.KEY_STACKED_SIGNAL,
                 Prefs.DEF_STACKED_SIGNAL, s.trioStyle);
         s.showSim1 = readStyledBoolean(bundle, Prefs.KEY_SHOW_SIM_1, Prefs.DEF_SHOW_SIM_1,
@@ -1209,6 +1223,7 @@ public final class TrioSettings {
         b.putInt(Prefs.styledKey(Prefs.KEY_SIGNAL_MODE, style), Prefs.clamp(signalMode,
                 Prefs.MIN_SIGNAL_MODE, Prefs.MAX_SIGNAL_MODE));
         b.putBoolean(Prefs.styledKey(Prefs.KEY_STACKED_SIGNAL, style), stackedSignal);
+        b.putBoolean(Prefs.KEY_DUAL_ROW, dualRow);
         b.putBoolean(Prefs.styledKey(Prefs.KEY_SHOW_SIM_1, style), showSim1);
         b.putBoolean(Prefs.styledKey(Prefs.KEY_SHOW_SIM_2, style), showSim2);
         b.putBoolean(Prefs.KEY_DATA_SIM_ONLY, dataSimOnly);
@@ -1301,6 +1316,7 @@ public final class TrioSettings {
                 && dualSim == s.dualSim
                 && signalMode == s.signalMode
                 && stackedSignal == s.stackedSignal
+                && dualRow == s.dualRow
                 // Two switches of their own, and issue 25 applies: left out, a tap
                 // on either row would write a value the screen cannot see change.
                 && showSim1 == s.showSim1

@@ -28,6 +28,12 @@ public final class DiagnosticsTest {
         check(text.contains("type=off\n"), "the network-type mode is reported");
         check(text.contains("charging=inherit\n"), "an absent scene reads as inherit");
         check(text.contains("quick=inherit\n"), "an absent fast-charge scene reads as inherit");
+        check(text.contains("dual=off\n"), "the merged-row switch is reported");
+
+        TrioSettings mergedRow = settings.copy();
+        mergedRow.dualRow = true;
+        check(DiagnosticsReport.render(facts, mergedRow).contains("dual=on\n"),
+                "a merged row is reported as on");
 
         TrioSettings withScene = settings.copy();
         withScene.trioStyle = Prefs.STYLE_CAPSULE;
