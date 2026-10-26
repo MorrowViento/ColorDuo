@@ -177,11 +177,7 @@ class SettingsRepository(context: Context, private val chargeScene: Int = Charge
     /** Publish one layout edit as a single local/remote transaction and one broadcast. */
     fun applyRingAssignment(next: TrioSettings, layoutEdit: Boolean = true) {
         val style = Prefs.normalizeTrioStyle(next.trioStyle)
-        val scene = if (next.editingChargeScene != ChargeLayout.BASE) {
-            next.editingChargeScene
-        } else {
-            chargeScene
-        }
+        val scene = chargeScene
         if (scene != ChargeLayout.BASE) {
             val snapshot = next.copy()
             // An explicit placement replaces the legacy "centre shows percentage" override,

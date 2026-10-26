@@ -219,12 +219,6 @@ public final class TrioSettings {
     /** As {@link #chargingLayout}, for fast charging. */
     public String quickChargingLayout = "";
     /**
-     * The scene an editor is currently showing, or {@link ChargeLayout#BASE} outside the
-     * charging tabs. Never persisted: it only tells a delayed save callback which key the
-     * user was looking at when they moved a component.
-     */
-    public int editingChargeScene;
-    /**
      * Absolute path of the user's font file, or "" for the system face.
      *
      * <p>Never null: the renderer treats null and "" the same, but a null here
@@ -372,7 +366,6 @@ public final class TrioSettings {
         s.chargingShowsValue = Prefs.DEF_CHARGING_SHOWS_VALUE;
         s.chargingLayout = "";
         s.quickChargingLayout = "";
-        s.editingChargeScene = ChargeLayout.BASE;
         s.fontPath = Prefs.DEF_FONT_PATH;
         s.dotScale = Prefs.DEF_DOT_SCALE;
         s.outOrder = Prefs.OUT_DEFAULT_ORDER.clone();
@@ -905,7 +898,6 @@ public final class TrioSettings {
         s.chargingShowsValue = chargingShowsValue;
         s.chargingLayout = chargingLayout;
         s.quickChargingLayout = quickChargingLayout;
-        s.editingChargeScene = ChargeLayout.BASE;
         s.fontPath = fontPath;
         s.dotScale = dotScale;
         s.outOrder = outOrder == null ? Prefs.OUT_DEFAULT_ORDER.clone() : outOrder.clone();

@@ -79,13 +79,23 @@ public final class ColorOsSettingsTest {
         TrioSettings withCharge = dual.copy();
         withCharge.chargingLayout = encodedCharge;
         TrioSettings drawCharge = ChargeLayout.forState(withCharge, true, false);
-        check(drawCharge.editingChargeScene == ChargeLayout.CHARGING, "charging scene is reported");
         check(Arrays.deepEquals(drawCharge.ringZones, charging.ringZones),
                 "charging scene draws its own arrangement");
         check(ChargeLayout.forState(withCharge, false, false) == withCharge,
                 "idle scene keeps the live snapshot untouched");
-        check(ChargeLayout.forState(withCharge, true, true).editingChargeScene == ChargeLayout.QUICK,
-                "fast charging is a distinct scene");
+
+        // Fast charging is a third arrangement, not a synonym for ordinary charging.
+        TrioSettings quickSource = dual.copy();
+        quickSource.ringZones = Prefs.decodeLayout("4,5|1|7|");
+        TrioSettings withQuick = withCharge.copy();
+        withQuick.quickChargingLayout = ChargeLayout.encode(quickSource);
+        check(Arrays.deepEquals(ChargeLayout.forState(withQuick, true, true).ringZones,
+                        quickSource.ringZones),
+                "fast charging draws its own arrangement");
+        check(!Arrays.deepEquals(ChargeLayout.forState(withQuick, true, true).ringZones,
+                        drawCharge.ringZones),
+                "fast charging differs from ordinary charging");
+
         check(TrioSettings.fromBundle(withCharge.toBundle()).chargingLayout
                         .equals(withCharge.chargingLayout),
                 "charging arrangement survives settings transport");

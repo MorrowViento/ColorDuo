@@ -113,17 +113,15 @@ public final class ChargeLayout {
     /**
      * The settings that belong to {@code scene}.
      *
-     * <p>Returns {@code base} itself when the scene has nothing stored, so callers can
-     * keep passing the live snapshot through unchanged. The copy carries the scene in
-     * {@link TrioSettings#editingChargeScene} so that an editor callback arriving after
-     * the user switched tabs still writes to the key the user was looking at.
+     * <p>Returns {@code base} itself for the idle scene, so the common path keeps passing
+     * the live snapshot through unchanged. A scene with nothing stored decodes as a copy of
+     * the base arrangement, which is what lets the editor start from the current look and
+     * diverge only where the user changes something.
      */
     public static TrioSettings forScene(TrioSettings base, int scene) {
-        if (scene == BASE || base.editingChargeScene == scene) return base;
+        if (scene == BASE) return base;
         String raw = scene == QUICK ? base.quickChargingLayout : base.chargingLayout;
         TrioSettings s = decode(raw, base);
-        if (s == null) s = base.copy();
-        s.editingChargeScene = scene;
-        return s;
+        return s == null ? base.copy() : s;
     }
 }
