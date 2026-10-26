@@ -122,6 +122,7 @@ final class ColorOsHooks {
         }
         TrioHooks.useLogger(module);
         installed = true;
+        HookReport.adapterInstalled();
         TrioConfig.install(module);
         TrioConfig.addListener(ColorOsHooks::invalidateHosts);
 
@@ -601,6 +602,14 @@ final class ColorOsHooks {
             }
             if (!active) capture();
             active = true;
+            // One summary line per process, and only while the user asked for logs: it answers
+            // "did the adapter hook what this build actually has", which the settings side
+            // cannot know.
+            if (TrioConfig.debugLog() && HookReport.firstHost()) {
+                TrioHooks.log(TrioHooks.LOG_INFO,
+                        HookReport.render(wifiFlow != null, MOBILES.size()));
+            }
+            HookReport.hostApplied();
             // The arrangement may differ per charging scene, so the host has to reserve
             // the space of the arrangement it is about to draw, not of the idle one.
             TrioAppearance appearance = TrioAppearance.of(ChargeLayout.forState(
