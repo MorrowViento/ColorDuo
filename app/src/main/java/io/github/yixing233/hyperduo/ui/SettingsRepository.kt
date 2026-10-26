@@ -226,6 +226,14 @@ class SettingsRepository(context: Context, private val chargeScene: Int = Charge
         writeArrangement(ChargeLayout.QUICK, next.quickChargingLayout)
     }
 
+    /**
+     * Drops a scene's own arrangement so it follows the idle one again.
+     *
+     * <p>Without this a charging screen, once edited, could never be un-customised: the key
+     * would keep winning over the base layout even after the user removed every piece.
+     */
+    fun clearChargeScene(scene: Int) = writeArrangement(scene, "")
+
     /** Writes one scene's encoded arrangement, removing the key when it means "inherit". */
     private fun writeArrangement(scene: Int, encoded: String) {
         val key = Prefs.styledKey(ChargeLayout.key(scene), style())

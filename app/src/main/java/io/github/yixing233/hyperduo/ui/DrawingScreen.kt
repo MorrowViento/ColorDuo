@@ -288,6 +288,8 @@ private fun DrawingEditorCard(
     var pendingReset by remember { mutableStateOf(false) }
     // The recommendation replaces every placement at once, so it asks before doing it.
     var confirmingRecommended by remember { mutableStateOf(false) }
+    // Dropping a charging scene's own layout is destructive too.
+    var confirmingInherit by remember { mutableStateOf(false) }
     // The zone whose picker is open, if any. One at a time: the picker is a dialog,
     // and two stacked pickers would be a state with no sensible dismissal order.
     var picking by remember { mutableStateOf<TrioZones.Zone?>(null) }
@@ -307,6 +309,16 @@ private fun DrawingEditorCard(
     // say which arrangement it is touching; the inspector and the tabs stay in agreement.
     val update: ((SettingsRepository) -> Unit) -> Unit = { block ->
         dispatch { repo -> block(repo.forChargeScene(scene.chargeScene)) }
+    }
+
+    // Whether this tab owns an arrangement or is still inheriting the idle one. Only the two
+    // charging tabs have the concept, and it is read from the stored snapshot rather than the
+    // scoped copy, which always materialises a layout.
+    val chargingTab = scene == PreviewScene.Charging || scene == PreviewScene.QuickCharging
+    val ownsArrangement = when (scene) {
+        PreviewScene.Charging -> baseSettings.chargingLayout.isNotEmpty()
+        PreviewScene.QuickCharging -> baseSettings.quickChargingLayout.isNotEmpty()
+        else -> false
     }
 
     val appearance = TrioAppearance.of(settings)
@@ -376,6 +388,23 @@ private fun DrawingEditorCard(
                 onSelect = { scene = it },
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
             )
+            if (chargingTab) {
+                Text(
+                    text = stringResource(
+                        if (ownsArrangement) R.string.drawing_scene_custom
+                        else R.string.drawing_scene_inherited,
+                    ),
+                    style = MiuixTheme.textStyles.footnote1,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+                if (ownsArrangement) {
+                    TextButton(
+                        text = stringResource(R.string.drawing_scene_inherit),
+                        onClick = { confirmingInherit = true },
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    )
+                }
+            }
             TextButton(
                 text = stringResource(R.string.drawing_restore_recommended),
                 onClick = { confirmingRecommended = true },
@@ -651,6 +680,36 @@ private fun DrawingEditorCard(
                     modifier = Modifier.weight(1f),
                 ) {
                     Text(text = stringResource(R.string.drawing_restore_recommended_confirm))
+                }
+            }
+        }
+    }
+
+    if (confirmingInherit) {
+        OverlayDialog(
+            show = true,
+            title = stringResource(R.string.drawing_scene_inherit),
+            summary = stringResource(R.string.drawing_scene_inherit_summary),
+            onDismissRequest = { confirmingInherit = false },
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                TextButton(
+                    text = stringResource(R.string.cancel),
+                    onClick = { confirmingInherit = false },
+                    modifier = Modifier.weight(1f),
+                )
+                Button(
+                    onClick = {
+                        confirmingInherit = false
+                        update { it.clearChargeScene(scene.chargeScene) }
+                    },
+                    colors = ButtonDefaults.buttonColorsPrimary(),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(text = stringResource(R.string.drawing_scene_inherit_confirm))
                 }
             }
         }
