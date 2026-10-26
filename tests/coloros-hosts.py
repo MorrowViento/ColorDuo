@@ -80,6 +80,13 @@ public final class ColorOsHostTest {
         static TrioAppearance appearance=new TrioAppearance();
         static TrioSettings get(){return config;}
         static TrioAppearance appearance(){return appearance;}
+        static boolean debugLog(){return false;}
+    }
+    /** The real one counts hook coverage; the fixture never enables the log branch. */
+    static class HookReport {
+        static boolean firstHost(){return false;}
+        static String render(boolean wifi,int mobile){return "";}
+        static void hostApplied(){}
     }
     /** The real one decodes an arrangement; this fixture only cares about host lifecycle. */
     static class ChargeLayout {

@@ -16,3 +16,7 @@ else
     java -m jdk.compiler/com.sun.tools.javac.Main -encoding UTF-8 -d "$test_classes" @"$test_sources"
 fi
 java -Djava.awt.headless=true -Xmx512m -cp "$test_classes" io.github.yixing233.hyperduo.ColorOsSettingsTest
+# The diagnostics block is a separate contract over the same shims. It runs here rather than
+# as its own workflow step because changing .github/workflows needs the Workflows token
+# permission; the script is self-contained either way.
+sh tests/diagnostics.sh

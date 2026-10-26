@@ -326,4 +326,9 @@
     <string name="drawing_restore_recommended">恢复推荐布局</string>
     <string name="drawing_restore_recommended_summary">把当前样式的组件位置恢复为推荐布局，颜色和尺寸保持不变。</string>
     <string name="drawing_restore_recommended_confirm">恢复</string>
+    <!-- Copyable key=value block on the About page, for bug reports. -->
+    <string name="about_diagnostics_title">诊断信息</string>
+    <string name="about_diagnostics_summary">复制当前配置和设备信息，粘贴到问题反馈里。</string>
+    <string name="about_diagnostics_copy">复制诊断信息</string>
+    <string name="about_diagnostics_copied">已复制到剪贴板</string>
 </resources>

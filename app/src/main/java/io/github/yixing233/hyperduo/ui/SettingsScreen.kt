@@ -10,6 +10,8 @@
 
 package io.github.yixing233.hyperduo.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -99,6 +101,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.pm.PackageInfoCompat
+import io.github.yixing233.hyperduo.DiagnosticsReport
 import io.github.yixing233.hyperduo.HyperDuoApp
 import io.github.yixing233.hyperduo.Prefs
 import io.github.yixing233.hyperduo.R
@@ -1390,6 +1393,7 @@ private fun LazyListScope.aboutTab(
 ) {
     item { ActivatedRow(settings = settings, service = service) }
     item { InfoCard(service = service) }
+    item { DiagnosticsCard(settings = settings, service = service, showMessage = showMessage) }
     item { UpdateCard(updater, showMessage) }
     item {
         Card {
@@ -1910,6 +1914,64 @@ private fun StatCard(label: String, value: String, modifier: Modifier = Modifier
  * equivalent for 鈥?the scope list and the Android level are what a user actually
  * needs to report a bug, so they stay on rather than being dropped for symmetry.
  */
+/**
+ * Copyable diagnostics: the device, the SystemUI build and every stored arrangement, as one
+ * key=value block. The settings app can answer all of it itself, so this needs no cooperation
+ * from the hooked process - which is also why it is the first half of the 16-branch report.
+ */
+@Composable
+private fun DiagnosticsCard(
+    settings: TrioSettings,
+    service: XposedService?,
+    showMessage: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    val report = remember(context, settings, service) {
+        val module = readModuleInfo(context)
+        DiagnosticsReport.render(
+            DiagnosticsReport.Facts(
+                module.moduleVersion,
+                "${Build.MANUFACTURER} ${Build.MODEL}",
+                "${Build.VERSION.RELEASE} (${Build.VERSION.SDK_INT})",
+                systemUiVersion(context),
+                service != null,
+            ),
+            settings,
+        )
+    }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Text(
+                text = stringResource(R.string.about_diagnostics_title),
+                style = MiuixTheme.textStyles.subtitle,
+            )
+            Text(
+                text = stringResource(R.string.about_diagnostics_summary),
+                style = MiuixTheme.textStyles.footnote1,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            TextButton(
+                text = stringResource(R.string.about_diagnostics_copy),
+                onClick = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE)
+                        as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("ColorDuo", report))
+                    showMessage(context.getString(R.string.about_diagnostics_copied))
+                },
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+    }
+}
+
+/** The SystemUI build the module hooks, or "unknown" when it cannot be read. */
+private fun systemUiVersion(context: Context): String = try {
+    val info = context.packageManager.getPackageInfo("com.android.systemui", 0)
+    "${info.versionName} (${info.longVersionCode})"
+} catch (ignored: Exception) {
+    "unknown"
+}
+
 @Composable
 private fun InfoCard(service: XposedService?) {
     val context = LocalContext.current

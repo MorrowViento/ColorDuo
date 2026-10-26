@@ -14,7 +14,7 @@ PLATFORM_FILES = {"HyperDuoModule.java", "WifiPresence.java", "ui/UpdateControll
 # has to edit them. Everything else - rendering, geometry, zones, appearance - stays
 # byte-compared to the pinned upstream commit, so an upstream change there still fails.
 DIVERGED_FILES = {"Prefs.java", "TrioSettings.java", "ui/DrawingScreen.kt",
-                  "ui/SettingsRepository.kt"}
+                  "ui/SettingsRepository.kt", "ui/SettingsScreen.kt"}
 EXPOSED_HELPERS = (
     "static final class OutTypeLabel",
     "static final class PerfLabel",

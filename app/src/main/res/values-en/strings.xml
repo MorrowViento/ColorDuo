@@ -327,4 +327,9 @@
     <string name="drawing_restore_recommended">Restore recommended layout</string>
     <string name="drawing_restore_recommended_summary">Put this style\'s pieces back to the recommended arrangement. Colours and sizes are kept.</string>
     <string name="drawing_restore_recommended_confirm">Restore</string>
+    <!-- Copyable key=value block on the About page, for bug reports. -->
+    <string name="about_diagnostics_title">Diagnostics</string>
+    <string name="about_diagnostics_summary">Copy the current configuration and device facts for a bug report.</string>
+    <string name="about_diagnostics_copy">Copy diagnostics</string>
+    <string name="about_diagnostics_copied">Copied to the clipboard</string>
 </resources>
