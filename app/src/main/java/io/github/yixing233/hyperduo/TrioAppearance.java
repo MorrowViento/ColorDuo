@@ -103,6 +103,11 @@ public final class TrioAppearance {
      */
     public final boolean stackedSignal;
     /**
+     * Draw both cards' level rows in the zone that holds SIM 1, and suppress SIM 2's own
+     * row. See {@link Prefs#KEY_DUAL_ROW}.
+     */
+    public final boolean dualRow;
+    /**
      * The user wants a <em>second</em> row of level dots while the glyph has
      * neither Wi-Fi ink nor a charger to report - see {@link #dualReading}.
      */
@@ -149,7 +154,7 @@ public final class TrioAppearance {
      */
     public final boolean perfPower;
     /** The battery temperature is drawn in the same out-of-ring strip. */
-    public final boolean perfTemp;
+    public final boolean perfTemp;
     /** Drops the temperature unless a charger is attached; see {@link Prefs#KEY_PERF_TEMP_CHARGING_ONLY}. */
     public final boolean perfTempChargingOnly;
     /**
@@ -283,6 +288,7 @@ public final class TrioAppearance {
         mobile = c.showMobile;
         signalOutOfRing = c.signalMode == Prefs.SIGNAL_OUT_RING;
         stackedSignal = c.stackedSignal;
+        dualRow = c.dualRow;
         dualSim = c.dualSim;
         showSim1 = c.showSim1;
         showSim2 = c.showSim2;
@@ -300,7 +306,7 @@ public final class TrioAppearance {
         chargingShowsValue = c.chargingShowsValue;
         fontPath = c.fontPath == null ? "" : c.fontPath;
         perfPower = c.perfPower;
-        perfTemp = c.perfTemp;
+        perfTemp = c.perfTemp;
         perfTempChargingOnly = c.perfTempChargingOnly;
         perfScale = c.perfScale;
         perfWeight = c.perfWeight;
@@ -1054,9 +1060,12 @@ public final class TrioAppearance {
             // from the mobile switch alone, so the user saw signal dots they could not move or
             // remove. See the Capsule class comment.
             case Prefs.PART_SIM_1:
-                return a.mobile && a.showSim1 && !a.signalOutOfRing && !a.rect;
+                // Merged, either card having a reading is enough to draw the pair; SIM 2's
+                // own slot is suppressed below so the pair is drawn exactly once.
+                return a.mobile && (a.dualRow ? (a.showSim1 || a.showSim2) : a.showSim1)
+                        && !a.signalOutOfRing && !a.rect;
             case Prefs.PART_SIM_2:
-                return a.mobile && a.showSim2 && !a.signalOutOfRing && !a.rect;
+                return a.mobile && a.showSim2 && !a.dualRow && !a.signalOutOfRing && !a.rect;
             case Prefs.PART_CLOCK:
                 // The clock always has something to say; whether the arrangement shows it
                 // is the renderer's business.

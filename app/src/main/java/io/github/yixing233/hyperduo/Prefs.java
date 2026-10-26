@@ -729,6 +729,15 @@ public final class Prefs {
      */
     public static final String KEY_STACKED_SIGNAL = "stacked_signal";
     /**
+     * Merges the two cards' level rows into one, drawn where SIM 1 is placed.
+     *
+     * <p>A zone holds exactly one component, so two cards in one notch would otherwise be
+     * impossible. With this on, the zone that holds SIM 1 draws eight beads - SIM 1's four,
+     * a gap, then SIM 2's four - and SIM 2's own row is not drawn at all. Off by default:
+     * it changes what a placed row means, so it is opt-in.
+     */
+    public static final String KEY_DUAL_ROW = "dual_signal_row";
+    /**
      * Draws only the current data SIM's out-of-ring signal row, leaving the other
      * SIM out entirely.
      *
@@ -1344,6 +1353,8 @@ public final class Prefs {
      * signal back to MIUI rather than draw a second version of it.
      */
     public static final boolean DEF_STACKED_SIGNAL = false;
+    /** Off by default: merging the two rows is a deliberate change of meaning. */
+    public static final boolean DEF_DUAL_ROW = false;
     /** Off by default: the stacked reading shows both SIMs unless told otherwise. */
     public static final boolean DEF_DATA_SIM_ONLY = false;
 

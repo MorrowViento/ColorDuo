@@ -13,7 +13,8 @@ PLATFORM_FILES = {"HyperDuoModule.java", "WifiPresence.java", "ui/UpdateControll
 # (see ChargeLayout.java) needs storage keys and snapshot fields, and the drawing screen
 # has to edit them. Everything else - rendering, geometry, zones, appearance - stays
 # byte-compared to the pinned upstream commit, so an upstream change there still fails.
-DIVERGED_FILES = {"Prefs.java", "TrioSettings.java", "ui/DrawingScreen.kt",
+DIVERGED_FILES = {"Prefs.java", "TrioSettings.java", "TrioAppearance.java",
+                  "TrioRenderer.java", "ui/ContentControls.kt", "ui/DrawingScreen.kt",
                   "ui/SettingsRepository.kt", "ui/SettingsScreen.kt"}
 EXPOSED_HELPERS = (
     "static final class OutTypeLabel",

@@ -342,4 +342,7 @@
     <string name="about_diagnostics_live">Read live state</string>
     <string name="about_diagnostics_live_ok">Channel ok: %1$s</string>
     <string name="about_diagnostics_live_timeout">System UI did not answer - restart it and retry</string>
+    <!-- Prototype: draw both SIM cards' level rows in one zone. -->
+    <string name="dual_row_title">Merge both cards\' rows</string>
+    <string name="dual_row_summary">Draw both cards in SIM 1\'s zone: four beads, a gap, four more. SIM 2\'s own row is not drawn separately. Ring style only for now.</string>
 </resources>

@@ -483,9 +483,16 @@ final class TrioRenderer {
                 // The user's size multiplies the reference bead; the opening's room still
                 // caps it, so a large setting stops growing rather than overrunning the
                 // arc's caps. See TrioGeometry.arcRowDotR's four-argument form.
-                drawArcDotRow(c, active, z,
-                        TrioGeometry.arcRowDotR(z, a.ringStroke, width, a.dotScaleFactor()),
-                        fg, a);
+                final float radius =
+                        TrioGeometry.arcRowDotR(z, a.ringStroke, width, a.dotScaleFactor());
+                if (a.dualRow && part == Prefs.PART_SIM_1) {
+                    // Both cards in one row: SIM 1's four beads, a gap, SIM 2's four.
+                    final int sim1 = levels == null ? -1 : levels[0];
+                    final int sim2 = levels == null ? -1 : levels[1];
+                    drawDualDotRow(c, sim1, sim2, z, radius, fg, a);
+                } else {
+                    drawArcDotRow(c, active, z, radius, fg, a);
+                }
             } else {
                 final String text = part == Prefs.PART_VALUE ? String.valueOf(level)
                         : part == Prefs.PART_TYPE ? type : TrioState.sClockText;
@@ -631,6 +638,57 @@ final class TrioRenderer {
             c.drawCircle(ringX - TrioGeometry.B_CX,
                     ringY - TrioGeometry.ZONE_CY[zone], radius, FILL);
         }
+    }
+
+    /**
+     * Both cards' level rows in one band: SIM 1's four beads, a gap, SIM 2's four.
+     *
+     * <p>The same two shapes as {@link #drawArcDotRow} - beads threaded onto the opening in
+     * the top and bottom thirds, a horizontal run in the middle. The gap is deliberately
+     * narrower than a full pitch: wide enough to read as two groups, small enough that eight
+     * beads still fit the opening the single row used.
+     */
+    private static void drawDualDotRow(Canvas c, int sim1, int sim2, int zone, float radius,
+                                       int fg, TrioAppearance a) {
+        final int inactive = withAlpha(fg, a.trackAlpha);
+        final int[] levels = {clampLevel(sim1), clampLevel(sim2)};
+        if (zone == 1) {
+            final float step = radius * 2.1f;
+            final float gap = radius * 1.6f;
+            final float total = 6f * step + gap;
+            for (int dot = 0; dot < 8; dot++) {
+                final int group = dot / 4, within = dot % 4;
+                final float x = (group == 0 ? 0f : gap + 3f * step)
+                        + within * step - total * 0.5f;
+                FILL.setColor(within < levels[group] ? fg : inactive);
+                c.drawCircle(x, 0f, radius, FILL);
+            }
+            return;
+        }
+        final float rho = TrioGeometry.B_R;
+        final float openingRad = (float) Math.toRadians(TrioGeometry.GAP_WIDTH_DEG);
+        final float inset = (radius + a.ringStroke * 0.5f + 1f) / rho;
+        final float halfAngle = Math.max(0f, openingRad * 0.5f - inset);
+        final float beadHalfAngle = (float) Math.toRadians(TrioGeometry.BEAD_SPAN_DEG * 0.5f);
+        final float halfCentreAngle = Math.min(halfAngle, beadHalfAngle);
+        final float gapAngle = halfCentreAngle * 0.18f;
+        final float groupHalf = halfCentreAngle - gapAngle;
+        final float sign = zone == 2 ? 1f : -1f;
+        for (int dot = 0; dot < 8; dot++) {
+            final int group = dot / 4, within = dot % 4;
+            final float magnitude = gapAngle + groupHalf * (1f - within / 3f);
+            final float angle = group == 0 ? -magnitude : magnitude;
+            final float ringX = TrioGeometry.B_CX + rho * (float) Math.sin(angle);
+            final float ringY = TrioGeometry.B_CY + sign * rho * (float) Math.cos(angle);
+            FILL.setColor(within < levels[group] ? fg : inactive);
+            c.drawCircle(ringX - TrioGeometry.B_CX, ringY - TrioGeometry.ZONE_CY[zone],
+                    radius, FILL);
+        }
+    }
+
+    /** A reading outside 0..4 (including "no reading") contributes no lit beads. */
+    private static int clampLevel(int level) {
+        return level < 0 ? 0 : Math.min(4, level);
     }
 
     /**
