@@ -337,4 +337,8 @@
     <string name="drawing_scene_inherit">改用普通布局</string>
     <string name="drawing_scene_inherit_summary">删除这个页签的独立布局，之后跟随普通布局的变化。</string>
     <string name="drawing_scene_inherit_confirm">沿用</string>
+    <!-- Live hook report channel: the reply is one key=value line. -->
+    <string name="about_diagnostics_live">读取实时状态</string>
+    <string name="about_diagnostics_live_ok">通道正常：%1$s</string>
+    <string name="about_diagnostics_live_timeout">系统界面没有响应，重启系统界面后再试</string>
 </resources>

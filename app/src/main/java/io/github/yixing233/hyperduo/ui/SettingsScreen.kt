@@ -10,10 +10,15 @@
 
 package io.github.yixing233.hyperduo.ui
 
+import android.app.Activity
+import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import java.io.File
@@ -1926,7 +1931,9 @@ private fun DiagnosticsCard(
     showMessage: (String) -> Unit,
 ) {
     val context = LocalContext.current
-    val report = remember(context, settings, service) {
+    // The live line is fetched on demand; once present it rides along with the copied report.
+    var liveHook by remember { mutableStateOf<String?>(null) }
+    val report = remember(context, settings, service, liveHook) {
         val module = readModuleInfo(context)
         DiagnosticsReport.render(
             DiagnosticsReport.Facts(
@@ -1937,7 +1944,7 @@ private fun DiagnosticsCard(
                 service != null,
             ),
             settings,
-        )
+        ) + (liveHook?.let { "hook=$it\n" } ?: "")
     }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
@@ -1960,6 +1967,24 @@ private fun DiagnosticsCard(
                 },
                 modifier = Modifier.padding(top = 8.dp),
             )
+            // Asks the hooked process what it actually hooked; the reply is added to the
+            // copied report as one more line.
+            TextButton(
+                text = stringResource(R.string.about_diagnostics_live),
+                onClick = {
+                    requestHookReport(context) { answer ->
+                        if (answer != null) liveHook = answer
+                        showMessage(
+                            if (answer == null) {
+                                context.getString(R.string.about_diagnostics_live_timeout)
+                            } else {
+                                context.getString(R.string.about_diagnostics_live_ok, answer)
+                            },
+                        )
+                    }
+                },
+                modifier = Modifier.padding(top = 4.dp),
+            )
         }
     }
 }
@@ -1970,6 +1995,44 @@ private fun systemUiVersion(context: Context): String = try {
     "${info.versionName} (${info.longVersionCode})"
 } catch (ignored: Exception) {
     "unknown"
+}
+
+/**
+ * Round-trips the hook report channel; null means SystemUI did not answer in time.
+ *
+ * <p>Ordered broadcast rather than a service: the reply is delivered only to this receiver,
+ * and the receiver side restricts senders with a signature permission.
+ */
+private fun requestHookReport(context: Context, done: (String?) -> Unit) {
+    val handler = Handler(Looper.getMainLooper())
+    var settled = false
+    val timeout = Runnable {
+        if (!settled) {
+            settled = true
+            done(null)
+        }
+    }
+    val receiver = object : BroadcastReceiver() {
+        override fun onReceive(received: Context?, intent: Intent?) {
+            if (settled) return
+            settled = true
+            handler.removeCallbacks(timeout)
+            done(resultData)
+        }
+    }
+    handler.postDelayed(timeout, 2_000)
+    try {
+        context.sendOrderedBroadcast(
+            Intent(DiagnosticsReport.REPORT_ACTION).setPackage(DiagnosticsReport.SYSTEMUI_PACKAGE),
+            null, receiver, handler, Activity.RESULT_CANCELED, null, null,
+        )
+    } catch (ignored: Throwable) {
+        handler.removeCallbacks(timeout)
+        if (!settled) {
+            settled = true
+            done(null)
+        }
+    }
 }
 
 @Composable
