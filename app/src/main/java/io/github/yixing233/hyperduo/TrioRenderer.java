@@ -489,7 +489,7 @@ final class TrioRenderer {
                     // Both cards in one row: SIM 1's four beads, a gap, SIM 2's four.
                     final int sim1 = levels == null ? -1 : levels[0];
                     final int sim2 = levels == null ? -1 : levels[1];
-                    drawDualDotRow(c, sim1, sim2, z, radius, fg, a);
+                    drawDualDotRow(c, sim1, sim2, z, radius, (int) width, fg, a);
                 } else {
                     drawArcDotRow(c, active, z, radius, fg, a);
                 }
@@ -649,19 +649,27 @@ final class TrioRenderer {
      * beads still fit the opening the single row used.
      */
     private static void drawDualDotRow(Canvas c, int sim1, int sim2, int zone, float radius,
-                                       int fg, TrioAppearance a) {
+                                       int width, int fg, TrioAppearance a) {
         final int inactive = withAlpha(fg, a.trackAlpha);
         final int[] levels = {clampLevel(sim1), clampLevel(sim2)};
+        // Eight beads in the room four used: the span is fixed by the slot, so the beads
+        // have to give way. Placing them at even fractions and then sizing the bead to the
+        // pitch is what keeps them from touching - the first cut kept the old radius and the
+        // eight of them merged into one blob on the device.
+        final float gapFraction = 0.18f;
+        final float groupFraction = (1f - gapFraction) * 0.5f;
         if (zone == 1) {
-            final float step = radius * 2.1f;
-            final float gap = radius * 1.6f;
-            final float total = 6f * step + gap;
+            final float span = Math.max(radius * 4f, width * 0.92f);
+            final float bead = Math.min(radius, span / 8f * 0.40f);
+            final float usable = span - 2f * bead;
             for (int dot = 0; dot < 8; dot++) {
                 final int group = dot / 4, within = dot % 4;
-                final float x = (group == 0 ? 0f : gap + 3f * step)
-                        + within * step - total * 0.5f;
+                final float fraction = group == 0
+                        ? (within / 3f) * groupFraction
+                        : groupFraction + gapFraction + (within / 3f) * groupFraction;
+                final float x = -usable * 0.5f + fraction * usable;
                 FILL.setColor(within < levels[group] ? fg : inactive);
-                c.drawCircle(x, 0f, radius, FILL);
+                c.drawCircle(x, 0f, bead, FILL);
             }
             return;
         }
@@ -669,20 +677,23 @@ final class TrioRenderer {
         final float openingRad = (float) Math.toRadians(TrioGeometry.GAP_WIDTH_DEG);
         final float inset = (radius + a.ringStroke * 0.5f + 1f) / rho;
         final float halfAngle = Math.max(0f, openingRad * 0.5f - inset);
-        final float beadHalfAngle = (float) Math.toRadians(TrioGeometry.BEAD_SPAN_DEG * 0.5f);
-        final float halfCentreAngle = Math.min(halfAngle, beadHalfAngle);
-        final float gapAngle = halfCentreAngle * 0.18f;
-        final float groupHalf = halfCentreAngle - gapAngle;
+        // The whole opening, not just the span the four beads used: eight need the room.
+        final float span = 2f * halfAngle * rho;
+        final float bead = Math.min(radius, span / 8f * 0.40f);
+        final float usable = span - 2f * bead;
         final float sign = zone == 2 ? 1f : -1f;
         for (int dot = 0; dot < 8; dot++) {
             final int group = dot / 4, within = dot % 4;
-            final float magnitude = gapAngle + groupHalf * (1f - within / 3f);
-            final float angle = group == 0 ? -magnitude : magnitude;
+            final float fraction = group == 0
+                    ? (within / 3f) * groupFraction
+                    : groupFraction + gapFraction + (within / 3f) * groupFraction;
+            final float position = -usable * 0.5f + fraction * usable;
+            final float angle = position / rho;
             final float ringX = TrioGeometry.B_CX + rho * (float) Math.sin(angle);
             final float ringY = TrioGeometry.B_CY + sign * rho * (float) Math.cos(angle);
             FILL.setColor(within < levels[group] ? fg : inactive);
             c.drawCircle(ringX - TrioGeometry.B_CX, ringY - TrioGeometry.ZONE_CY[zone],
-                    radius, FILL);
+                    bead, FILL);
         }
     }
 
