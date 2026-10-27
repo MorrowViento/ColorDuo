@@ -57,6 +57,15 @@ public class SubscriptionManager {
     "android/telephony/ServiceState.java": """
 package android.telephony;
 public class ServiceState {
+    public static class Registration {
+        public int transport;
+        public boolean searching;
+        public Registration(int transport,boolean searching){this.transport=transport;this.searching=searching;}
+        public int getTransportType(){return transport;}
+        public boolean isNetworkSearching(){return searching;}
+    }
+    public java.util.List<Registration> registrations = java.util.List.of();
+    public java.util.List<Registration> getNetworkRegistrationInfoList(){return registrations;}
     public int voice, data;
     public boolean emergency, legacy;
     public ServiceState(int voice, int data, boolean emergency) {
@@ -125,6 +134,9 @@ public final class DuoPolicyTest {
         check(!foldMobile(true, 2, Radio.NO_SERVICE, false), "warning not visible: keep native");
         check(foldMobile(true, 0, Radio.NO_SIM, true), "visible no-SIM warning owns native slot");
         check(!foldMobile(true, 2, Radio.UNKNOWN, true), "uncertain service preserves native");
+        check(!hasNotice(Radio.REGISTERING), "registration has no notice text");
+        check(foldMobile(true, 0, Radio.REGISTERING, false),
+              "known registration keeps the cellular area blank instead of flashing native icons");
         check(!foldMobile(true, 2, Radio.AIRPLANE, true), "airplane preserves system indicator");
         check(!foldMobile(false, 2, Radio.AVAILABLE, true), "hand-back always releases ownership");
         check((pausedColor(0xccffffff) >>> 24) == 0xcc, "paused style preserves native alpha");
@@ -132,19 +144,24 @@ public final class DuoPolicyTest {
         Context c = new Context();
         check(sample(c).radio == Radio.NO_SIM, "empty subscriptions plus absent SIMs");
         c.phone.sims[0] = 0;
-        check(sample(c).radio == Radio.UNKNOWN, "modem initializing is not no-SIM");
+        check(sample(c).radio == Radio.NO_SERVICE, "empty usable-line list with unknown SIM presence is not no-SIM");
         c.phone.sims[0] = 2;
-        check(sample(c).radio == Radio.UNKNOWN, "locked or inactive SIM is not absent");
+        check(sample(c).radio == Radio.NO_SERVICE, "locked or inactive SIM has no usable line, not an absent card");
+        c.phone.sims[0] = 5;
+        check(sample(c).radio == Radio.NO_SERVICE,
+              "disabling the last inserted SIM has no usable line and must not hand off as unknown");
         c.subs.active = null;
         check(sample(c).radio == Radio.UNKNOWN, "null subscription query is unknown");
         c.subs.active = List.of(new SubscriptionInfo(11,0), new SubscriptionInfo(22,1));
         c.phone.createForSubscriptionId(11).service = new ServiceState(0,0,false);
         c.phone.createForSubscriptionId(22).service = new ServiceState(1,1,false);
         ColorOsRadio.Sample selected = sample(c);
-        check(selected.dataSlot == 1 && selected.radio == Radio.NO_SERVICE,
+        check(selected.dataSlot == 1 && selected.reportedRadio == Radio.NO_SERVICE && selected.radio == Radio.REGISTERING,
               "working secondary cannot conceal no service on selected data line");
         c.phone.createForSubscriptionId(22).service.emergency = true;
-        check(sample(c).radio == Radio.EMERGENCY_ONLY, "real service sample preserves SOS");
+        ColorOsRadio.Sample emergency = sample(c);
+        check(emergency.reportedRadio == Radio.EMERGENCY_ONLY && emergency.radio == Radio.REGISTERING,
+              "raw emergency-only stays observable while the display waits for registration to settle");
         c.phone.createForSubscriptionId(22).service.data = 0;
         c.phone.createForSubscriptionId(22).service.emergency = false;
         check(sample(c).radio == Radio.AVAILABLE, "data registration recovers service");
@@ -165,12 +182,105 @@ public final class DuoPolicyTest {
         c.phone.createForSubscriptionId(22).service = new ServiceState(1,1,true);
         check(cached.sample(c, 999).radio == Radio.AVAILABLE, "all hosts share a bounded snapshot");
         check(c.subs.queries == before+1, "no repeated IPC inside sampling interval");
-        check(cached.sample(c, 1000).radio == Radio.EMERGENCY_ONLY, "next sample sees service change");
+        check(cached.sample(c, 1000).radio == Radio.REGISTERING, "next sample sees registration pending");
         SubscriptionManager.dataId = 11;
         check(cached.sample(c, 2000).dataSlot == 0, "data-line switch refreshes without restart");
         c.subs.active = List.of();
         c.phone.sims = new int[]{1,1};
         check(cached.sample(c, 3000).radio == Radio.NO_SIM, "SIM removal clears old service");
+
+        // Realistic single-SIM sequence: enabled -> disabled -> re-enabled -> registered.
+        Context single = new Context();
+        SubscriptionManager.dataId = 11;
+        SubscriptionInfo card = new SubscriptionInfo(11,0);
+        single.subs.active = List.of(card);
+        single.phone.sims = new int[]{5,1};
+        single.phone.createForSubscriptionId(11).service = new ServiceState(0,0,false);
+        ColorOsRadio switching = new ColorOsRadio();
+        check(switching.sample(single,0).radio == Radio.AVAILABLE, "single SIM initially in service");
+        single.subs.active = List.of();
+        check(switching.sample(single,1000).radio == Radio.NO_SERVICE,
+              "disabled last SIM keeps a module no-service indication");
+        single.phone.sims[0] = 0;
+        check(switching.sample(single,2000).radio == Radio.NO_SERVICE,
+              "disabled SIM remains no-service even when modem reports an unknown card state");
+        single.subs.active = List.of(card);
+        single.phone.createForSubscriptionId(11).service = new ServiceState(1,1,true);
+        check(switching.sample(single,3000).radio == Radio.REGISTERING,
+              "re-enable emergency registration does not flash SOS");
+        single.phone.createForSubscriptionId(11).service = new ServiceState(0,0,false);
+        check(switching.sample(single,4000).radio == Radio.AVAILABLE,
+              "normal registration resumes immediately without a false SOS");
+        single.phone.createForSubscriptionId(11).service = new ServiceState(1,1,true);
+        check(switching.sample(single,5000).radio == Radio.REGISTERING, "new SOS candidate begins settling");
+        check(switching.sample(single,6000).radio == Radio.REGISTERING, "one second is not sustained SOS");
+        check(switching.sample(single,7000).radio == Radio.REGISTERING, "two seconds is not sustained SOS");
+        check(switching.sample(single,8000).radio == Radio.EMERGENCY_ONLY,
+              "persistent emergency-only remains visible after three seconds");
+        single.subs.active = List.of(new SubscriptionInfo(22,0));
+        SubscriptionManager.dataId = 22;
+        single.phone.createForSubscriptionId(22).service = new ServiceState(1,1,true);
+        check(switching.sample(single,9000).radio == Radio.REGISTERING,
+              "a different subscription cannot inherit the previous line's SOS timer");
+        single.subs.denied = true;
+        check(switching.sample(single,10000).radio == Radio.UNKNOWN, "permission failure still returns unknown");
+        single.subs.denied = false;
+        check(switching.sample(single,11000).radio == Radio.REGISTERING,
+              "a failed observation resets the emergency stability window");
+        check(switching.sample(single,14000).radio == Radio.EMERGENCY_ONLY,
+              "genuine sustained SOS can recover after an unavailable query");
+        single.airplane = 1;
+        check(switching.sample(single,15000).radio == Radio.AIRPLANE,
+              "airplane mode never inherits a pending emergency warning");
+        single.airplane = 0;
+        single.phone.createForSubscriptionId(22).service = new ServiceState(1,1,false);
+        check(switching.sample(single,16000).radio == Radio.REGISTERING,
+              "non-emergency registration also remains blank initially");
+        check(switching.sample(single,19000).radio == Radio.NO_SERVICE,
+              "persistent loss of service still gets its explicit warning");
+        single.phone.createForSubscriptionId(22).service = new ServiceState(0,0,false);
+        check(switching.sample(single,20000).radio == Radio.AVAILABLE,
+              "successful registration restores signals immediately");
+        ServiceState stillSearching = new ServiceState(1,1,true);
+        stillSearching.registrations = List.of(new ServiceState.Registration(1,true));
+        single.phone.createForSubscriptionId(22).service = stillSearching;
+        check(switching.sample(single,21000).radio == Radio.REGISTERING,
+              "explicit WWAN search has priority over transient emergency-only");
+        check(switching.sample(single,60000).radio == Radio.REGISTERING,
+              "ongoing network registration stays blank even beyond the stability window");
+        stillSearching.registrations = List.of(new ServiceState.Registration(1,false));
+        check(switching.sample(single,61000).radio == Radio.REGISTERING,
+              "search completion starts a fresh SOS stability window");
+        check(switching.sample(single,64000).radio == Radio.EMERGENCY_ONLY,
+              "sustained emergency-only is shown after search ends");
+        stillSearching.registrations = List.of(new ServiceState.Registration(2,true));
+        check(switching.sample(single,65000).radio == Radio.EMERGENCY_ONLY,
+              "Wi-Fi registration cannot blank an established cellular warning");
+        stillSearching.data = 0;
+        stillSearching.registrations = List.of(new ServiceState.Registration(1,true));
+        check(switching.sample(single,66000).radio == Radio.AVAILABLE,
+              "working packet data takes priority over another registration still searching");
+
+        for (String slot : List.of("nosim_all", "nosim_one", "nosim_two")) {
+            check(!foldSlot(slot,true,0,Radio.NO_SERVICE,false), "no-SIM placeholder stays until warning is visible");
+            check(foldSlot(slot,true,0,Radio.NO_SERVICE,true), "visible no-service replaces dedicated no-SIM slot");
+            check(foldSlot(slot,true,0,Radio.NO_SIM,true), "visible no-SIM replaces dedicated no-SIM slot");
+            check(foldSlot(slot,true,1,Radio.AVAILABLE,false),
+                  "working module signal keeps a stale no-SIM placeholder from flashing on re-enable");
+            check(!foldSlot(slot,true,0,Radio.UNKNOWN,true), "unknown state retains native no-SIM indication");
+            check(foldSlot(slot,true,0,Radio.REGISTERING,false), "registration does not flash a native no-SIM placeholder");
+            check(!foldSlot(slot,false,0,Radio.NO_SERVICE,true), "component hand-back preserves native no-SIM");
+        }
+        check(!foldSlot("airplane",true,0,Radio.REGISTERING,true), "airplane icon is never part of no-SIM handoff");
+        check(!foldSlot("wifi",true,0,Radio.NO_SERVICE,true), "no-SIM handoff cannot swallow Wi-Fi");
+        Context staleDefault = new Context();
+        staleDefault.subs.active = List.of(new SubscriptionInfo(11,0),new SubscriptionInfo(22,1));
+        staleDefault.phone.createForSubscriptionId(11).service = new ServiceState(1,1,false);
+        staleDefault.phone.createForSubscriptionId(22).service = new ServiceState(0,0,false);
+        SubscriptionManager.dataId = 99;
+        ColorOsRadio.Sample fallback = sample(staleDefault);
+        check(fallback.dataId == 22 && fallback.dataSlot == 1 && fallback.radio == Radio.AVAILABLE,
+              "an inactive default ID falls back to the actual working line during re-enable");
         System.out.println("Duo policy and production telephony sampling passed: " + checks + " checks");
     }
 }
@@ -238,11 +348,15 @@ public final class DuoNoticeTest {
         check(row.type.alpha==1f && row.perf.alpha==0f,"dropped slots are actually invisible");
         check(DuoPolicy.foldMobile(true,0,DuoPolicy.Radio.NO_SIM,row.hasVisibleRadioNotice()),
               "native no-SIM can hide only after the warning is visible");
+        check(DuoPolicy.foldSlot("nosim_all",true,0,DuoPolicy.Radio.NO_SERVICE,row.hasVisibleRadioNotice()),
+              "disabled-SIM placeholder is replaced only after real notice layout");
         row.width=0;
         row.onLayout(true,0,0,0,16);
         check(!row.hasVisibleRadioNotice(),"zero-width warning releases native immediately");
         check(!DuoPolicy.foldMobile(true,0,DuoPolicy.Radio.NO_SIM,row.hasVisibleRadioNotice()),
               "native indication survives a constrained layout");
+        check(!DuoPolicy.foldSlot("nosim_all",true,0,DuoPolicy.Radio.NO_SERVICE,row.hasVisibleRadioNotice()),
+              "no space restores the dedicated ColorOS no-SIM indication");
         row.width=150;
         row.onLayout(true,0,0,150,16);
         check(row.hasVisibleRadioNotice(),"warning recovers when space returns");

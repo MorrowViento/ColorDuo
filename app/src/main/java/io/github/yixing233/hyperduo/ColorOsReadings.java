@@ -58,7 +58,8 @@ final class ColorOsReadings extends ViewGroup {
         TrioRenderer.outSignalLevels(appearance.dataSimOnly, state.mobileLevel,
                 state.slotLevels, state.dataSlot, levels);
         if (levels[0] < 0) levels[0] = 0;
-        signal.setVisibility(appearance.stackedOut() ? VISIBLE : GONE);
+        boolean registering = state.mobileService == DuoPolicy.Radio.REGISTERING;
+        signal.setVisibility(appearance.stackedOut() && !registering ? VISIBLE : GONE);
         signal.invalidate();
 
         String performance = TrioHooks.perfText(appearance);
@@ -75,7 +76,7 @@ final class ColorOsReadings extends ViewGroup {
         perf.setLineSpacing(0f, TrioHooks.perfLineSpacing(perf, performance, this));
 
         radioNotice = appearance.foldsMobile() && DuoPolicy.hasNotice(state.mobileService);
-        String network = radioNotice ? ColorOsLabels.radioNotice(getContext(), state.mobileService)
+        String network = registering ? "" : radioNotice ? ColorOsLabels.radioNotice(getContext(), state.mobileService)
                 : state.mobileType == null ? "" : state.mobileType;
         if (!network.contentEquals(type.getText()) || type.suffixScale != appearance.typeSuffixScale) {
             TrioHooks.applyOutTypeText(type, network, appearance.typeSuffixScale);

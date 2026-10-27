@@ -769,7 +769,7 @@ final class ColorOsHooks {
                 state.slotLevels = new int[] {-1, -1};
                 state.sims = 0;
                 TrioState.setMobileType("");
-                noteMobile();
+                noteMobile(radio);
                 return;
             }
             int dataId = radio.dataId;
@@ -798,8 +798,7 @@ final class ColorOsHooks {
                         if (state.dataSlot < 0) state.dataSlot = slot;
                         if (state.mobileService == DuoPolicy.Radio.UNKNOWN && mobile != null) {
                             Object service = value(mobile.inService);
-                            if (service instanceof Boolean) state.mobileService = (Boolean) service
-                                    ? DuoPolicy.Radio.AVAILABLE : DuoPolicy.Radio.NO_SERVICE;
+                            if (Boolean.TRUE.equals(service)) state.mobileService = DuoPolicy.Radio.AVAILABLE;
                         }
                     }
                 }
@@ -807,19 +806,21 @@ final class ColorOsHooks {
                 if (TrioConfig.debugLog()) TrioHooks.log(TrioHooks.LOG_WARN, "ColorOS telephony: " + error);
             }
             state.sims = (state.slotLevels[0] >= 0 ? 1 : 0) + (state.slotLevels[1] >= 0 ? 1 : 0);
-            if (DuoPolicy.hasNotice(state.mobileService)) {
-                state.mobileLevel = 0;
+            if (DuoPolicy.hasNotice(state.mobileService) || state.mobileService == DuoPolicy.Radio.REGISTERING) {
+                state.mobileLevel = state.mobileService == DuoPolicy.Radio.REGISTERING ? -1 : 0;
                 state.mobileType = "";
             }
             TrioState.setMobileType(state.mobileType);
-            noteMobile();
+            noteMobile(radio);
         }
 
-        private void noteMobile() {
+        private void noteMobile(ColorOsRadio.Sample radio) {
             if (TrioConfig.debugLog()) {
                 String note = "ColorOS mobile: models=" + MOBILES.size() + " dataSlot=" + TrioState.sDataSlot
                         + " levels=" + java.util.Arrays.toString(state.slotLevels) + " type=" + state.mobileType
-                        + " service=" + state.mobileService + " primarySlot=" + state.dataSlot;
+                        + " service=" + state.mobileService + " reported=" + radio.reportedRadio
+                        + " primarySlot=" + state.dataSlot
+                        + " subscriptions=" + (radio.subscriptions == null ? -1 : radio.subscriptions.size());
                 if (!note.equals(lastMobileNote)) {
                     lastMobileNote = note;
                     TrioHooks.log(TrioHooks.LOG_INFO, note);
@@ -863,11 +864,11 @@ final class ColorOsHooks {
             if (iconContainer != null) for (int i = 0; i < iconContainer.getChildCount(); i++) {
                 Object slot = Refl.callByName(iconContainer.getChildAt(i), "getSlot");
                 if (!(slot instanceof String)) continue;
+                boolean noticeVisible = extra != null && extra.hasVisibleRadioNotice();
+                if (DuoPolicy.foldSlot((String) slot, appearance.foldsMobile(), state.sims,
+                        state.mobileService, noticeVisible)) wanted.add((String) slot);
                 if (slot.equals("wifi") && appearance.ownsWifi() && state.wifiLevel >= 0) wanted.add((String) slot);
                 if (slot.equals("mobile") || slot.equals("stacked_mobile")) {
-                    boolean noticeVisible = extra != null && extra.hasVisibleRadioNotice();
-                    if (DuoPolicy.foldMobile(appearance.foldsMobile(), state.sims,
-                            state.mobileService, noticeVisible)) wanted.add((String) slot);
                     // Upstream also hands off the RAT label when bars remain native.
                     // Track only these children; never hide the whole radio for a type label.
                     for (String name : new String[] {"mobile_type_text", "mobile_type_image"}) {

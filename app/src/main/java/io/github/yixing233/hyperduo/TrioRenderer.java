@@ -277,7 +277,8 @@ final class TrioRenderer {
         }
         drawInto(canvas, w, h, s.level, s.charging, s.quickCharging, s.powerSave, s.low,
                 s.wifiPresent ? s.wifiLevel : -1, s.mobileLevel, s.slotLevels, s.mobileType,
-                s.foreground(), cfg, true, s.wifiPresent, s.dataSlot, s.chargingPaused);
+                s.foreground(), cfg, true, s.wifiPresent, s.dataSlot, s.chargingPaused,
+                s.mobileService == DuoPolicy.Radio.REGISTERING);
     }
 
     /**
@@ -337,9 +338,20 @@ final class TrioRenderer {
                          int wifiLevel, int mobileLevel, int[] slotLevels, String mobileType,
                          int fg, TrioSettings cfg, boolean clearWhenDone,
                          boolean wifiConnected, int dataSlot, boolean chargingPaused) {
+        drawInto(canvas, w, h, level, charging, quickCharging, powerSave, low,
+                wifiLevel, mobileLevel, slotLevels, mobileType, fg, cfg, clearWhenDone,
+                wifiConnected, dataSlot, chargingPaused, false);
+    }
+
+    private static void drawInto(Canvas canvas, int w, int h, int level, boolean charging,
+                                 boolean quickCharging, boolean powerSave, boolean low,
+                                 int wifiLevel, int mobileLevel, int[] slotLevels, String mobileType,
+                                 int fg, TrioSettings cfg, boolean clearWhenDone,
+                                 boolean wifiConnected, int dataSlot, boolean chargingPaused, boolean radioMuted) {
         if (w <= 0 || h <= 0 || cfg == null) {
             return;
         }
+        if (radioMuted) mobileType = "";
         if (chargingPaused) {
             // Keep the charging layout and bolt, with a neutral paused-charge appearance.
             charging = true;
@@ -413,13 +425,13 @@ final class TrioRenderer {
 
         if (capsule) {
             drawCapsuleLayout(canvas, level, charging, quickCharging, wifiLevel, mobileLevel, shownType,
-                    slots, sims, role, fg, appearance, wifiConnected, dataSlot);
+                    slots, sims, role, fg, appearance, wifiConnected, dataSlot, radioMuted);
         } else if (rect) {
             drawRectLayout(canvas, level, charging, quickCharging, wifiLevel, mobileLevel,
-                    DuoPolicy.automaticLevels(slots, dataSlot), sims, shownType, role, fg, appearance);
+                    DuoPolicy.automaticLevels(slots, dataSlot), sims, shownType, role, fg, appearance, radioMuted);
         } else {
             drawRingLayout(canvas, level, charging, quickCharging, wifiLevel, mobileLevel,
-                    slots, sims, shownType, role, fg, appearance, wifiConnected);
+                    slots, sims, shownType, role, fg, appearance, wifiConnected, radioMuted);
         }
 
         canvas.restoreToCount(save);
@@ -437,21 +449,23 @@ final class TrioRenderer {
     private static void drawRingLayout(Canvas canvas, int level, boolean charging,
                                        boolean quickCharging, int wifiLevel, int mobileLevel,
                                        int[] slotLevels, int sims, String mobileType, int role,
-                                       int fg, TrioAppearance a, boolean wifiConnected) {
+                                       int fg, TrioAppearance a, boolean wifiConnected, boolean radioMuted) {
         final TrioAppearance.Ring r = a.ring(level, charging, wifiLevel, mobileType, sims,
                 wifiConnected);
         drawFreeRing(canvas, level, quickCharging, wifiLevel, mobileLevel,
-                slotLevels, mobileType, role, fg, a, r);
+                slotLevels, mobileType, role, fg, a, r, radioMuted);
     }
 
     /** Explicit slots share the editor's thirds and fit ink on BOTH axes. */
     private static void drawFreeRing(Canvas c, int level, boolean quickCharging, int wifiLevel,
                                      int mobileLevel, int[] levels, String type, int role, int fg,
-                                     TrioAppearance a, TrioAppearance.Ring r) {
+                                     TrioAppearance a, TrioAppearance.Ring r, boolean radioMuted) {
         drawBattery(c, level, role, fg, a, r.gapStart(), r.gapEnd(), r.sweep(), r.arcStart());
         for (int z = 0; z < 3; z++) {
             final int part = r.parts[z];
             if (part == Prefs.PART_NONE) continue;
+            if (radioMuted && (part == Prefs.PART_MOBILE
+                    || part == Prefs.PART_SIM_1 || part == Prefs.PART_SIM_2)) continue;
             final float cx = TrioGeometry.B_CX;
             final float cy = TrioGeometry.ZONE_CY[z];
             final float width = 78f - a.ringStroke;
@@ -666,9 +680,9 @@ final class TrioRenderer {
     private static void drawRectLayout(Canvas canvas, int level, boolean charging,
                                        boolean quickCharging, int wifiLevel, int mobileLevel,
                                        int[] slotLevels, int sims, String mobileType, int role,
-                                       int fg, TrioAppearance a) {
+                                       int fg, TrioAppearance a, boolean radioMuted) {
         final TrioAppearance.Rect r = a.rect(level, charging, wifiLevel, mobileType, sims);
-        if (r.dots) {
+        if (r.dots && !radioMuted) {
             drawRectDots(canvas, mobileLevel, slotLevels, r.dual, fg, a);
         }
         drawRectBatteryBar(canvas, level, role, fg, a);
@@ -713,7 +727,7 @@ final class TrioRenderer {
     private static void drawCapsuleLayout(Canvas canvas, int level, boolean charging,
                                           boolean quickCharging, int wifiLevel, int mobileLevel, String mobileType,
                                           int[] slotLevels, int sims, int role, int fg,
-                                          TrioAppearance a, boolean wifiConnected, int dataSlot) {
+                                          TrioAppearance a, boolean wifiConnected, int dataSlot, boolean radioMuted) {
         final float stroke = a.ringStroke * TrioGeometry.CAP_STROKE_RATIO;
         final TrioAppearance.Capsule cap =
                 a.capsule(level, charging, wifiLevel, mobileType, sims, wifiConnected);
@@ -740,7 +754,7 @@ final class TrioRenderer {
             drawCapsuleFill(canvas, stroke, Math.min(1f, level / 100f), topReach, bottomReach);
         }
 
-        if (cap.dots) {
+        if (cap.dots && !radioMuted) {
             drawCapsuleDots(canvas, mobileLevel, slotLevels, cap.dual, stroke, fg, a, cap, dataSlot);
         }
 

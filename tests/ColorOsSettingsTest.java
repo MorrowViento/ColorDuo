@@ -107,6 +107,20 @@ public final class ColorOsSettingsTest {
         check(gray > 100 && !equal(charging, paused), "paused state actually paints neutral gray");
         live.chargingPaused = false;
         check(equal(charging, render(live, dual)), "resume restores the exact charging appearance");
+        live.charging = false;
+        live.quickCharging = false;
+        for(TrioSettings style : new TrioSettings[]{dual,capsule,automatic}) {
+            live.mobileService = DuoPolicy.Radio.AVAILABLE;
+            live.slotLevels = new int[]{0,0};
+            BufferedImage zeroSignal = render(live, style);
+            live.mobileService = DuoPolicy.Radio.REGISTERING;
+            BufferedImage registering = render(live, style);
+            check(ink(registering) < ink(zeroSignal), "registration removes signal dots rather than drawing an unlit placeholder");
+            live.slotLevels = new int[]{4,1};
+            check(equal(registering, render(live, style)), "registration cannot leak stale SIM signal readings");
+            live.mobileService = DuoPolicy.Radio.AVAILABLE;
+            check(!equal(registering, render(live, style)), "successful registration restores the saved signal components");
+        }
         System.out.println("Settings migration, named SIM identity, data-line order and paused rendering passed");
     }
 
@@ -120,6 +134,14 @@ public final class ColorOsSettingsTest {
 
     private static boolean equal(BufferedImage left, BufferedImage right) {
         return Arrays.equals(left.getRGB(0,0,240,200,null,0,240), right.getRGB(0,0,240,200,null,0,240));
+    }
+
+    private static int ink(BufferedImage image) {
+        int count=0;
+        for(int y=0;y<image.getHeight();y++)for(int x=0;x<image.getWidth();x++) {
+            if((image.getRGB(x,y) >>> 24) != 0)count++;
+        }
+        return count;
     }
 
     private static void check(boolean value, String message) {

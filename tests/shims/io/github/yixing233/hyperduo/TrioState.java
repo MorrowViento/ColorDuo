@@ -31,6 +31,7 @@ final class TrioState {
     boolean quickCharging;
     boolean chargingPaused;
     int dataSlot = -1;
+    DuoPolicy.Radio mobileService = DuoPolicy.Radio.UNKNOWN;
     boolean powerSave;
     boolean low;
     boolean wifiPresent = true;

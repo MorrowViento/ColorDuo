@@ -10,7 +10,7 @@
 | 仓库 | `chorusfruit-233/ColorDuo` |
 | 应用 ID | `io.github.chorusfruit_233.colorduo` |
 | 源码 namespace | `io.github.yixing233.hyperduo`，沿用共享源码的命名 |
-| 当前版本 | `0.2.0` / `10009` |
+| 当前版本 | `0.2.1` / `10010` |
 | compileSdk / targetSdk / minSdk | 37 / 36 / 29 |
 | 框架 API | libxposed 102 |
 | 作用域 | `com.android.systemui` |
