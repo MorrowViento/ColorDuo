@@ -776,28 +776,15 @@ public final class TrioAppearance {
          */
         public final boolean dual;
 
-        /**
-         * The renderer and editor use the same opening around the top component.
-         *
-         * <p>Only the <em>dual reading</em> widens the mouth: its top row is
-         * {@code DOTS} mirrored about the ring centre, so the outer dots sit almost on
-         * the arc's own radius and a narrow mouth runs the rounded stroke end into
-         * them.
-         *
-         * <p>The ring's <b>bottom</b> opening is the reference for symmetry, not this
-         * mouth - see {@code TrioGeometry.B_SWEEP}, where the arc's own bottom opening
-         * was brought down to the top gap's width so the two halves mirror each other.
-         */
+        /** The renderer and editor open the ring around the same resolved component. */
         public float gapStart() {
             return !gapUsed ? TrioGeometry.GAP_NONE
-                    : dual ? TrioGeometry.GAP_START_DUAL
-                    : bolt ? TrioGeometry.GAP_START_CHARGE : TrioGeometry.GAP_START_IDLE;
+                    : 0.5f - TrioGeometry.ringOpeningDegrees(parts[0]) / (2f * sweep());
         }
 
         public float gapEnd() {
             return !gapUsed ? TrioGeometry.GAP_NONE
-                    : dual ? TrioGeometry.GAP_END_DUAL
-                    : bolt ? TrioGeometry.GAP_END_CHARGE : TrioGeometry.GAP_END_IDLE;
+                    : 0.5f + TrioGeometry.ringOpeningDegrees(parts[0]) / (2f * sweep());
         }
 
         /**
@@ -818,7 +805,7 @@ public final class TrioAppearance {
 
         /** The arc's angular sweep this frame; the full circle minus the bottom opening. */
         public float sweep() {
-            return bottomOpen() ? TrioGeometry.B_SWEEP : 360f;
+            return bottomOpen() ? 360f - TrioGeometry.ringOpeningDegrees(parts[2]) : 360f;
         }
 
         /**

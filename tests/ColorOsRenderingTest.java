@@ -19,6 +19,7 @@ public final class ColorOsRenderingTest {
         final List<Float> arcs = new ArrayList<>();
         final List<Integer> pathColors = new ArrayList<>();
         final List<String> texts = new ArrayList<>();
+        final List<java.awt.geom.Rectangle2D> textBounds = new ArrayList<>();
         float textSize;
 
         Frame() { this(new BufferedImage(480, 400, BufferedImage.TYPE_INT_ARGB).createGraphics()); }
@@ -34,6 +35,12 @@ public final class ColorOsRenderingTest {
         @Override public void drawText(String text, float x, float y, Paint paint) {
             texts.add(text);
             textSize = paint.getTextSize();
+            android.graphics.Rect ink = new android.graphics.Rect();
+            paint.getTextBounds(text, 0, text.length(), ink);
+            float left = x - (paint.getTextAlign() == Paint.Align.CENTER ? paint.measureText(text) * 0.5f
+                    : paint.getTextAlign() == Paint.Align.RIGHT ? paint.measureText(text) : 0f);
+            textBounds.add(graphics.getTransform().createTransformedShape(new java.awt.geom.Rectangle2D.Float(
+                    left + ink.left, y + ink.top, ink.right - ink.left, ink.bottom - ink.top)).getBounds2D());
             super.drawText(text, x, y, paint);
         }
         @Override public void close() { graphics.dispose(); }
@@ -42,6 +49,7 @@ public final class ColorOsRenderingTest {
     public static void main(String[] args) throws Exception {
         fullCapsule();
         clockHandoff();
+        readableDefaults();
         percentageSlider();
         System.out.println("Capsule fill, live clock handoff and reachable percentage sizing passed: " + checks + " checks");
     }
@@ -177,11 +185,69 @@ public final class ColorOsRenderingTest {
             }
         }
         settings.ringZones = Prefs.decodeLayout("|3||");
-        check(TrioRenderer.maxValueSize(TrioAppearance.of(settings)) == Prefs.MAX_RING_VALUE_SIZE,
-                "centre percentage retains its larger adjustable range");
+        check(TrioRenderer.maxValueSize(TrioAppearance.of(settings)) >= Prefs.DEF_VALUE_SIZE,
+                "centre range includes the default percentage");
         settings.trioStyle = Prefs.STYLE_CAPSULE;
         check(TrioRenderer.maxValueSize(TrioAppearance.of(settings)) == Prefs.MAX_CAPSULE_VALUE_SIZE,
                 "capsule size range is unchanged");
+    }
+
+    private static void readableDefaults() {
+        TrioSettings settings = TrioSettings.fromBundle(new android.os.Bundle());
+        settings.trioStyle = Prefs.STYLE_RING;
+        TrioState state = new TrioState();
+        check(settings.valueSize == 36, "first install and empty remote snapshots use the documented default");
+        for (int zone : new int[]{0, 2}) for (int stroke : new int[]{4, 14, 16}) {
+            settings.ringStroke = stroke;
+            settings.ringZones = Prefs.decodeLayout("|||");
+            settings.ringZones[zone] = new int[]{Prefs.PART_VALUE};
+            TrioAppearance appearance = TrioAppearance.of(settings);
+            check(TrioRenderer.maxValueSize(appearance) >= settings.valueSize,
+                    "default fits the advertised range in both end slots");
+            for (int level : new int[]{8, 88, 100}) {
+                state.level = level;
+                try (Frame frame = new Frame()) {
+                    TrioRenderer.drawState(frame, 480, 400, state, settings);
+                    check(Math.abs(frame.textSize - settings.valueSize) < 0.01f,
+                            "default 36 is actually drawn at 36: zone=" + zone + " level=" + level);
+                }
+            }
+            state.level = 88;
+            settings.valueSize = 40;
+            try (Frame frame = new Frame()) {
+                TrioRenderer.drawState(frame, 480, 400, state, settings);
+                check(frame.textSize > 36f, "both end slots can grow beyond the default");
+            }
+            settings.valueSize = Prefs.DEF_VALUE_SIZE;
+        }
+        settings.ringZones = Prefs.decodeLayout("3|6|7|");
+        settings.showSim1 = true;
+        TrioAppearance.Ring topText = TrioAppearance.of(settings).ring(88, false, -1, "5G", 2, false);
+        check(Math.abs((topText.gapEnd() - topText.gapStart()) * topText.sweep() - 120f) < 0.01f,
+                "text widens the top opening to clear the digits");
+        check(Math.abs(360f - topText.sweep() - 96f) < 0.01f,
+                "signal beads keep their original opening and spacing");
+        settings.ringZones = Prefs.decodeLayout("7|6|3|");
+        TrioAppearance.Ring bottomText = TrioAppearance.of(settings).ring(88, false, -1, "5G", 2, false);
+        check(Math.abs(360f - bottomText.sweep() - 120f) < 0.01f,
+                "bottom text has the same opening width as top text");
+        check(TrioGeometry.zoneTextRoomH(1, bottomText.parts)
+                        <= 2f * (TrioGeometry.ZONE_CUT_BOTTOM - TrioGeometry.ZONE_CY[1] - 2.5f),
+                "middle text cannot consume an occupied bottom band");
+        settings.ringZones = Prefs.decodeLayout("3|6|5|");
+        settings.mobileTypeMode = Prefs.MOBILE_TYPE_IN_RING;
+        settings.valueSize = Prefs.MAX_RING_VALUE_SIZE;
+        settings.clockSize = Prefs.MAX_CLOCK_SIZE;
+        settings.typeSize = Prefs.MAX_TYPE_SIZE;
+        state.mobileType = "5G";
+        try (Frame frame = new Frame()) {
+            TrioRenderer.drawState(frame, 480, 400, state, settings);
+            check(frame.textBounds.size() == 3, "top, middle and bottom all paint their selected text");
+            for (int a = 0; a < frame.textBounds.size(); a++) for (int b = a + 1; b < frame.textBounds.size(); b++) {
+                check(!frame.textBounds.get(a).intersects(frame.textBounds.get(b)),
+                        "enlarged text never consumes an occupied neighbouring band");
+            }
+        }
     }
 
     private static void check(boolean value, String message) {

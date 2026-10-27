@@ -10,7 +10,7 @@
 | 仓库 | `chorusfruit-233/ColorDuo` |
 | 应用 ID | `io.github.chorusfruit_233.colorduo` |
 | 源码 namespace | `io.github.yixing233.hyperduo`，沿用共享源码的命名 |
-| 当前版本 | `0.2.2` / `10011` |
+| 当前版本 | `0.2.3` / `10012` |
 | compileSdk / targetSdk / minSdk | 37 / 36 / 29 |
 | 框架 API | libxposed 102 |
 | 作用域 | `com.android.systemui` |
@@ -72,7 +72,7 @@ python3 tests/module-publish.py
 
 八组离线检查覆盖未演进的继承源码、Duo 状态与电话服务采样、原生模型与图标交接、配置和实际绘图、整包功率、多页面宿主恢复，以及两组发布检查。警告布局检查执行生产空间分配和可见性方法，覆盖窄宽度、零宽度、重排序及恢复。跨页面检查执行生产 Host 接管、恢复与读数挂载；不模拟真实 GPU、SystemUI 动画或 ROM 生命周期。Python 检查需要 Python 3，Java 检查使用 JDK 21。
 
-来源基线为 HyperDuo `e9dffbcc8f65a5f3dc379c0b25ccdc0462a8a28d`。`upstream-parity.py` 保护 20 个未演进文件，7 个 Duo 行为文件在明确列出的范围内自主维护，并由行为和绘图回归覆盖；默认值、旧配置迁移及共享功率公式继续保留。对齐依据和设备验证边界见 [适配记录](COLOROS17.md#020duo-状态语义)。
+来源基线为 HyperDuo `e9dffbcc8f65a5f3dc379c0b25ccdc0462a8a28d`。`upstream-parity.py` 保护 19 个未演进文件，8 个 Duo 行为文件在明确列出的范围内自主维护，并由行为和绘图回归覆盖；默认值、旧配置迁移及共享功率公式继续保留。对齐依据和设备验证边界见 [适配记录](COLOROS17.md#020duo-状态语义)。
 
 `tests/` 中其他 PowerShell 脚本继承自上游，记录了不同时间的接口与环境。ColorDuo 当前检查入口为以上检查和 [CI 工作流](../.github/workflows/build.yml)。源码或构建检查通过后，仍需按 [真机验收项目](COLOROS17.md#第一轮真机验收) 记录目标固件表现。
 

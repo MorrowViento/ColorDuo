@@ -281,16 +281,19 @@ public final class TrioRenderer {
                 ? Prefs.MAX_CAPSULE_VALUE_SIZE : Prefs.MAX_VALUE_SIZE;
         setFont(appearance.fontPath);
         applyWeight(appearance.valueWeight);
+        int[] occupied = new int[3];
+        for (int z = 0; z < occupied.length; z++) {
+            if (appearance.ringZones[z].length > 0) occupied[z] = appearance.ringZones[z][0];
+        }
         int maximum = 0;
         for (int z = 0; z < 3; z++) {
             boolean placed = false;
             for (int part : appearance.ringZones[z]) if (part == Prefs.PART_VALUE) placed = true;
             if (!placed) continue;
-            if (z == 1) return Prefs.MAX_RING_VALUE_SIZE;
             maximum = Math.max(maximum, Prefs.MIN_VALUE_SIZE);
             for (int size = Prefs.MAX_RING_VALUE_SIZE; size >= Prefs.MIN_VALUE_SIZE; size--) {
-                if (ringTextSize("100", size, z, appearance.ringStroke, 100) >= size - 0.01f
-                        && ringTextSize("88", size, z, appearance.ringStroke, 100) >= size - 0.01f) {
+                if (ringTextSize("100", size, z, appearance.ringStroke, 100, occupied) >= size - 0.01f
+                        && ringTextSize("88", size, z, appearance.ringStroke, 100, occupied) >= size - 0.01f) {
                     maximum = Math.max(maximum, size);
                     break;
                 }
@@ -583,7 +586,7 @@ public final class TrioRenderer {
                     // about 58% of the room it really had, and the bottom third came
                     // out around a third of the size asked for.
                     final int suffixScale = part == Prefs.PART_TYPE ? a.typeSuffixScale : 100;
-                    final float fitted = ringTextSize(text, requested, z, a.ringStroke, suffixScale);
+                    final float fitted = ringTextSize(text, requested, z, a.ringStroke, suffixScale, r.parts);
                     // Centred in the band, and on its INK rather than its metrics: the
                     // metrics reserve leading above the capitals that a digits-only
                     // string never draws, so a metrics-centred line sits high enough to
@@ -608,9 +611,10 @@ public final class TrioRenderer {
         }
     }
 
-    private static float ringTextSize(String text, float requested, int zone, int stroke, int suffixScale) {
+    private static float ringTextSize(String text, float requested, int zone, int stroke, int suffixScale,
+                                      int[] parts) {
         final float ink = Math.max(1f, textInkHeight(text, requested));
-        final float heightLimit = requested * TrioGeometry.zoneTextRoomH(zone) / ink;
+        final float heightLimit = requested * TrioGeometry.zoneTextRoomH(zone, parts) / ink;
         float fitted = heightLimit;
         for (int pass = 0; pass < 4; pass++) {
             float inkH = Math.max(1f, textInkHeight(text, fitted));

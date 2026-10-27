@@ -23,6 +23,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalConfiguration
@@ -750,7 +751,12 @@ internal fun PartSettingsSheet(
                             min = Prefs.MIN_LOW_THRESHOLD,
                             max = Prefs.MAX_LOW_THRESHOLD,
                             title = stringResource(R.string.low_threshold_title),
-                            summary = stringResource(R.string.low_threshold_summary),
+                            summary = stringResource(
+                                R.string.low_threshold_summary,
+                                Prefs.DEF_LOW_THRESHOLD,
+                                Prefs.MIN_LOW_THRESHOLD,
+                                Prefs.MAX_LOW_THRESHOLD,
+                            ),
                             enabled = a.glyph && a.roleColors,
                             onValueChange = { value -> update { it.setLowThreshold(value) } },
                         )
@@ -814,13 +820,19 @@ private fun SliderRow(
 ) {
     val a = TrioAppearance.of(settings)
     val maximum = spec.maxFor(a)
+    val defaults = remember { TrioSettings.defaults() }
     IntSlider(
         value = spec.read(settings).coerceAtMost(maximum),
         min = spec.min,
         max = maximum,
         step = spec.step,
         title = stringResource(spec.titleRes(a)),
-        summary = stringResource(spec.summaryRes(a)),
+        summary = stringResource(
+            spec.summaryRes(a),
+            spec.read(defaults).coerceIn(spec.min, maximum),
+            spec.min,
+            maximum,
+        ),
         enabled = spec.enabled(a),
         valueTextSuffix = spec.suffix,
         onValueChange = { v -> update { r -> spec.write(r, v) } },

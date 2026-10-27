@@ -1785,7 +1785,7 @@ private fun partSummaryRes(part: TrioZones.Part): Int = when (part) {
     TrioZones.Part.TYPE -> R.string.show_mobile_type_summary
     TrioZones.Part.SIM_1 -> R.string.show_sim_1_summary
     TrioZones.Part.SIM_2 -> R.string.show_sim_2_summary
-    TrioZones.Part.CLOCK -> R.string.clock_size_summary
+    TrioZones.Part.CLOCK -> R.string.show_clock_summary
 }
 
 /**

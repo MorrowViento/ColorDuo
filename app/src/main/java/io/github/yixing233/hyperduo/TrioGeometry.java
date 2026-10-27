@@ -307,90 +307,36 @@ final class TrioGeometry {
     // hit-tests the same cuts - so the numbers live here once and both read them.
     // Two copies of a cut line is how a hot spot ends up beside the piece it names.
 
-    /**
-     * Cut between the top third and the middle one.
-     *
-     * <p><b>38, unchanged.</b> Moving this was tried and reverted: the cut is not
-     * only a size hint, it is the line {@code TrioZones} hit-tests and the line
-     * {@code tests/drawing-zones.ps1} attributes every painted pixel to. Nudging it
-     * to 40 re-attributed the top of the Wi-Fi arcs to the top third and the harness
-     * failed with "WIFI loses ink only in the thirds that name it: got TOP".
-     *
-     * <p>The type's size problem is therefore solved on the type's own terms - see
-     * {@link #zoneTextRoomH} - rather than by redividing a box whose division other
-     * things depend on.
-     */
+    /** Editor and layout band boundaries; icon anchors remain independent. */
     static final float ZONE_CUT_TOP = 38f;
-    /**
-     * Cut between the middle third and the bottom one.
-     *
-     * <p><b>86, raised from 92.</b> This is the one cut that had to move, and the
-     * reason is measured rather than aesthetic: a placed reading is sized by the
-     * room its third gives, and the bottom third used to get
-     * {@code 2 * (104 - 92) = 24} units - about 15pt for a reading the user asked to
-     * be 36. Moving the cut up 6 units gives 36, which is the whole difference
-     * between "half the size you asked for" and "what the slider says".
-     *
-     * <p>What stops it going further is the middle third's tallest drawn piece: a
-     * bolt fitted to the slot box is 44 units tall about a centre line at 64, so it
-     * reaches y = 86. At 86 the two just touch, which is why the harness is what
-     * decides this number rather than a round figure.
-     *
-     * <p>The top cut stays at 38 on purpose: it is also the line the editor
-     * hit-tests, and moving it re-attributed the top of the Wi-Fi arcs to another
-     * third.
-     */
     static final float ZONE_CUT_BOTTOM = 86f;
-
-    /**
-     * The vertical centre each zone places its piece on: {@code 0} top,
-     * {@code 1} middle, {@code 2} bottom.
-     *
-     * <p>Fixed numbers rather than the middles of the thirds, and that is
-     * deliberate: the drawn figures - the arcs, the bolt, the dot rows - have their
-     * own sizes and were tuned against these centres, so re-centring them whenever
-     * a cut line moves would shift drawings that nobody asked to move. The cuts
-     * divide the <em>hot zones</em>; these say where a piece is painted.
-     *
-     * <p>Text is the one piece that is also bounded by the third it sits in (a
-     * reading has to fit the band it belongs to), which is why
-     * {@link #zoneTextRoomH} measures around these centres rather than around the
-     * cuts' middles - a mismatch there would fit the type to a band it is not drawn
-     * in.
-     */
     static final float[] ZONE_CY = { 19f, 64f, 104f };
 
-    /**
-     * The vertical room a placed text piece may use in zone {@code z}, in design
-     * units.
-     *
-     * <p>Two different rules, by design:
-     *
-     * <ul>
-     *   <li><b>Top and bottom</b> are limited by the <em>signal-dot box</em> - the
-     *       28 and 20 units the level dots were designed into. Those two slots exist
-     *       to hold a row of dots on the ring's own openings, so a reading placed
-     *       there is a guest in the dots' space and takes the dots' measure.
-     *   <li><b>Middle</b> is limited by the ring's interior, which is the largest
-     *       plainly available area in the glyph and the place a reading is actually
-     *       meant to sit.
-     * </ul>
-     *
-     * <p>Stating it this way is what keeps the three slots from having to share one
-     * compromised number: the middle gets the room it visibly has, while the two end
-     * slots stay in proportion with the dots they stand in for.
-     */
+    /** Text needs a wider opening than four signal beads, including a three-digit value. */
+    static final float TEXT_GAP_WIDTH_DEG = 120f;
+
+    static float ringOpeningDegrees(int part) {
+        return part == Prefs.PART_VALUE || part == Prefs.PART_TYPE || part == Prefs.PART_CLOCK
+                ? TEXT_GAP_WIDTH_DEG : GAP_WIDTH_DEG;
+    }
+
+    /** Text uses its whole band, rather than borrowing the shorter signal-dot box. */
     static float zoneTextRoomH(int z) {
-        if (z == 1) {
-            // The ring's interior, less a margin so the ink does not touch the arc.
-            // The interior is measured on the arc's inside edge; the extra two units
-            // clear the antialiased rim on both horizontal edges of the line, which is
-            // what turned "fits by measurement" into a two-pixel overlap.
-            return 2f * (B_R - Prefs.DEF_RING_STROKE) - 2f * ZONE_TEXT_INSET
-                    - 2f * ZONE_TYPE_FRINGE;
-        }
-        // A signal-dot box, less the same margin.
-        return signalDotBoxH(z) - 2f * ZONE_TEXT_INSET;
+        if (z == 0) return ZONE_CUT_TOP - INK_Y - 2f * ZONE_TEXT_INSET;
+        if (z == 2) return INK_Y + INK_H - ZONE_CUT_BOTTOM - 2f * ZONE_TEXT_INSET;
+        return 2f * (B_R - Prefs.DEF_RING_STROKE) - 2f * ZONE_TEXT_INSET
+                - 2f * ZONE_TYPE_FRINGE;
+    }
+
+    /** A middle reading can borrow empty space, but must clear occupied neighbouring bands. */
+    static float zoneTextRoomH(int z, int[] parts) {
+        float room = zoneTextRoomH(z);
+        if (z != 1 || parts == null) return room;
+        if (parts[0] != Prefs.PART_NONE) room = Math.min(room,
+                2f * (ZONE_CY[1] - ZONE_CUT_TOP - ZONE_TEXT_INSET));
+        if (parts[2] != Prefs.PART_NONE) room = Math.min(room,
+                2f * (ZONE_CUT_BOTTOM - ZONE_CY[1] - ZONE_TEXT_INSET));
+        return Math.max(0f, room);
     }
 
     /**
@@ -605,7 +551,7 @@ final class TrioGeometry {
      * circle. Insets a stroke's worth so the ink clears both caps.
      */
     static float openingChord(int z, int ringStroke) {
-        final double halfAngle = Math.toRadians(GAP_WIDTH_DEG * 0.5);
+        final double halfAngle = Math.toRadians(TEXT_GAP_WIDTH_DEG * 0.5);
         final float chord = (float) (2.0 * B_R * Math.sin(halfAngle));
         return Math.max(0f, chord - ringStroke - 4f * ZONE_TYPE_FRINGE);
     }
@@ -623,15 +569,10 @@ final class TrioGeometry {
      */
     private static final float ZONE_TYPE_FRINGE = 1f;
 
-    /**
-     * The centre a placed piece of <em>text</em> is drawn on, per zone.
-     *
-     * <p>The same centres the drawn figures use, deliberately: text that shifted
-     * whenever a cut line moved would sit off-centre from the arcs, the bolt and the
-     * dot rows it shares a third with, and every fit above is measured about this
-     * same point so the two always agree.
-     */
+    /** Text is centred in its full band; Wi-Fi, bolts and signal dots retain their own anchors. */
     static float zoneTextCy(int z, int ringStroke) {
+        if (z == 0) return (INK_Y + ZONE_CUT_TOP) * 0.5f;
+        if (z == 2) return (ZONE_CUT_BOTTOM + INK_Y + INK_H) * 0.5f;
         return ZONE_CY[z];
     }
 

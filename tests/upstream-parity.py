@@ -12,6 +12,7 @@ PLATFORM_FILES = {"HyperDuoModule.java", "WifiPresence.java", "ui/UpdateControll
 DUO_FILES = {
     "TrioState.java",             # Explicit pause, service and default-data state.
     "TrioRenderer.java",          # Paused styling and automatic data-line order.
+    "TrioGeometry.java",          # Text bands and openings fit readable battery digits.
     "TrioAppearance.java",        # Retain physical SIM identity in capsule bands.
     "TrioPreviewView.java",       # Preview the same paused rendering path.
     "ui/DrawingScreen.kt",        # Charging-paused preview scene.

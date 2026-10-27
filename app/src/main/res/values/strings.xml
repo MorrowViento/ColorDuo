@@ -50,9 +50,9 @@
     <string name="stacked_signal_title">堆叠信号</string>
     <string name="stacked_signal_summary">环外时由模块在电池旁自己画一组信号读数，不再交回系统图标。</string>
     <string name="out_signal_size_title">堆叠信号大小</string>
-    <string name="out_signal_size_summary">默认 15dp，可调 6–20dp。</string>
+    <string name="out_signal_size_summary">默认 %1$ddp，可调 %2$d–%3$ddp。</string>
     <string name="out_signal_margin_title">堆叠信号间距</string>
-    <string name="out_signal_margin_summary">默认 2dp，可调 0–16dp。</string>
+    <string name="out_signal_margin_summary">默认 %1$ddp，可调 %2$d–%3$ddp。</string>
     <string name="ring_position_sim_1">卡一信号点的位置</string>
     <string name="ring_position_sim_2">卡二信号点的位置</string>
     <string name="ring_position_value">电量数字的位置</string>
@@ -115,29 +115,29 @@
     <string name="trio_style_capsule">胶囊</string>
 
     <string name="show_wifi_title">显示 Wi-Fi 弧</string>
-    <string name="show_wifi_summary">最外层绘制 Wi-Fi 弧，弧数跟随信号强度。</string>
+    <string name="show_wifi_summary">连接 Wi-Fi 时，在所选区域用弧线显示信号强度。</string>
 
     <string name="show_mobile_title">显示移动信号点</string>
-    <string name="show_mobile_summary">底部绘制四个电平点表示移动信号强度。</string>
+    <string name="show_mobile_summary">在所选区域用四个点显示当前数据卡的信号强度。</string>
 
 
     <string name="charging_shows_value_title">充电时环内显示电量</string>
     <string name="charging_shows_value_summary">充电时中间显示电量百分比，拔线后恢复原来的内容。仅环形样式。</string>
     <string name="show_value_title">显示电量数字</string>
-    <string name="show_value_summary">环内显示电量百分比。</string>
+    <string name="show_value_summary">在所选区域显示当前电池电量百分比。</string>
 
     <string name="show_bolt_title">充电时显示闪电</string>
     <string name="bolt_scale_placed_hint">组件排序里的充电闪电</string>
     <string name="bolt_scale_title">充电闪电大小</string>
-    <string name="bolt_scale_summary">默认 100%，可调 60–160%。</string>
-    <string name="show_bolt_summary">充电时环内改为闪电图标。</string>
+    <string name="bolt_scale_summary">默认 %1$d%%，可调 %2$d–%3$d%%。</string>
+    <string name="show_bolt_summary">充电或充电暂停时，在所选区域显示闪电。</string>
     <string name="dot_scale_title">环内信号点大小</string>
-    <string name="dot_scale_summary">上部与下部两排点共用。默认 100% 即点径等于环的粗细；可调 50–160%，放大会在上下的缺口里停止增长。</string>
+    <string name="dot_scale_summary">默认 %1$d%%，可调 %2$d–%3$d%%。上下信号点共用，放大不超出缺口。</string>
 
     <string name="type_hide_on_wifi_title">连 Wi-Fi 时隐藏网络类型</string>
-    <string name="type_hide_on_wifi_summary">Wi-Fi 已连接时隐藏，断开或切到流量后自动恢复。</string>
+    <string name="type_hide_on_wifi_summary">连接 Wi-Fi 时，网络类型为已放置的 Wi-Fi 弧让位；断开后恢复。</string>
     <string name="show_mobile_type_title">网络类型</string>
-    <string name="show_mobile_type_summary">3G/4G/5G 等文字，可放在环内或环外。</string>
+    <string name="show_mobile_type_summary">显示当前数据卡的 4G、5G 等网络类型，可放在图标内或图标旁。</string>
     <string name="mobile_type_off">关闭</string>
     <string name="mobile_type_inside">环内</string>
     <string name="mobile_type_outside">环外</string>
@@ -153,12 +153,12 @@
     <string name="perf_temp_title">电池温度</string>
 
     <string name="glyph_scale_title">图标整体尺寸</string>
-    <string name="glyph_scale_summary">默认 100%，可调 60–100%。</string>
+    <string name="glyph_scale_summary">默认 %1$d%%，可调 %2$d–%3$d%%。</string>
 
     <string name="perf_scale_title">读数整体尺寸</string>
-    <string name="perf_scale_summary">默认 100%，可调 60–150%。</string>
+    <string name="perf_scale_summary">默认 %1$d%%，可调 %2$d–%3$d%%。</string>
     <string name="perf_weight_title">读数字重</string>
-    <string name="perf_weight_summary">默认 700，可调 100–900。</string>
+    <string name="perf_weight_summary">默认 %1$d，可调 %2$d–%3$d。</string>
 
     <string name="perf_pair_title">充电功率与电池温度</string>
 
@@ -178,51 +178,53 @@
     <string name="color_reset_confirm">恢复</string>
 
     <string name="low_threshold_title">低电量阈值</string>
-    <string name="low_threshold_summary">默认 20%，可调 5–50%。</string>
+    <string name="low_threshold_summary">默认 %1$d%%，可调 %2$d–%3$d%%。</string>
 
     <string name="stroke_title">环线粗细</string>
-    <string name="stroke_summary">默认 14dp，可调 4–16dp。</string>
+    <string name="stroke_summary">默认 %1$d，可调 %2$d–%3$d。</string>
     <string name="stroke_title_rect">电量条粗细</string>
-    <string name="stroke_summary_rect">默认 14dp，可调 4–16dp。</string>
+    <string name="stroke_summary_rect">默认 %1$d，可调 %2$d–%3$d。</string>
 
     <string name="wifi_scale_title">Wi-Fi 弧尺寸</string>
-    <string name="wifi_scale_summary">默认 100%，可调 60–160%。在各自样式的适配空间内放大。</string>
+    <string name="wifi_scale_summary">默认 %1$d%%，可调 %2$d–%3$d%%。在所选区域内缩放。</string>
     <string name="arc_stroke_title">弧线粗细</string>
-    <string name="arc_stroke_summary">默认 12dp，可调 3–16dp。</string>
-    <string name="arc_stroke_summary_rect">默认 12dp，可调 3–16dp。</string>
+    <string name="arc_stroke_summary">默认 %1$d，可调 %2$d–%3$d。</string>
+    <string name="arc_stroke_summary_rect">默认 %1$d，可调 %2$d–%3$d。</string>
 
     <string name="value_size_title">数字字号</string>
-    <string name="value_size_summary">默认 36，可调 16–44（环内居中最大 56）。</string>
+    <string name="value_size_summary">默认 %1$d，可调 %2$d–%3$d。范围随格位和字体调整。</string>
 
     <string name="value_weight_title">数字字重</string>
-    <string name="value_weight_summary">默认 700，可调 100–900。</string>
+    <string name="value_weight_summary">默认 %1$d，可调 %2$d–%3$d。</string>
+
+    <string name="show_clock_summary">在所选区域显示时间，显示时隐藏系统状态栏时间。</string>
 
     <string name="clock_size_title">时钟字号</string>
-    <string name="clock_size_summary">默认 36，可调 16–44。</string>
+    <string name="clock_size_summary">默认 %1$d，可调 %2$d–%3$d。</string>
 
     <string name="clock_weight_title">时钟字重</string>
-    <string name="clock_weight_summary">默认 700，可调 100–900。</string>
+    <string name="clock_weight_summary">默认 %1$d，可调 %2$d–%3$d。</string>
 
     <string name="type_size_title">网络类型字号</string>
-    <string name="type_size_summary">默认 32，可调 16–44。</string>
+    <string name="type_size_summary">默认 %1$d，可调 %2$d–%3$d。</string>
 
     <string name="out_type_size_title">环外网络类型字号</string>
-    <string name="out_type_size_summary">默认 14dp，可调 8–26dp。</string>
+    <string name="out_type_size_summary">默认 %1$ddp，可调 %2$d–%3$ddp。</string>
 
     <string name="out_type_margin_left_title">环外网络类型左边距</string>
-    <string name="out_type_margin_left_summary">默认 2dp，可调 0–16dp。</string>
+    <string name="out_type_margin_left_summary">默认 %1$ddp，可调 %2$d–%3$ddp。</string>
 
     <string name="out_type_margin_right_title">环外网络类型右边距</string>
-    <string name="out_type_margin_right_summary">默认 2dp，可调 0–16dp。</string>
+    <string name="out_type_margin_right_summary">默认 %1$ddp，可调 %2$d–%3$ddp。</string>
 
     <string name="type_suffix_scale_title">5GA 中 A 的比例</string>
-    <string name="type_suffix_scale_summary">默认 65%，可调 50–100%。</string>
+    <string name="type_suffix_scale_summary">默认 %1$d%%，可调 %2$d–%3$d%%。</string>
 
     <string name="type_weight_title">网络类型字重</string>
-    <string name="type_weight_summary">默认 700，可调 100–900。</string>
+    <string name="type_weight_summary">默认 %1$d，可调 %2$d–%3$d。</string>
 
     <string name="track_alpha_title">底纹浓度</string>
-    <string name="track_alpha_summary">默认 56，可调 0–255。</string>
+    <string name="track_alpha_summary">默认 %1$d，可调 %2$d–%3$d。</string>
 
     <string name="nav_section">界面</string>
     <string name="nav_style_title">底栏样式</string>
@@ -303,7 +305,7 @@
     <string name="capsule_container_title">胶囊结构</string>
     <string name="capsule_container_summary">长度与左右两格的位置。</string>
     <string name="capsule_length_title">胶囊长度</string>
-    <string name="capsule_length_summary">默认 0，可调 -30 到 60。加长的是两端圆角之间的直线段，胶囊随之变宽，圆角与高度不变。</string>
+    <string name="capsule_length_summary">默认 %1$d，可调 %2$d–%3$d。调整胶囊宽度，高度和圆角保持不变。</string>
     <string name="capsule_nudge_left_dx_title">左格水平位置</string>
     <string name="capsule_nudge_left_dx_summary">正值右移，负值左移。</string>
     <string name="capsule_nudge_left_dy_title">左格垂直位置</string>
