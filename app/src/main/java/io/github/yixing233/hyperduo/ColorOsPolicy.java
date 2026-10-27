@@ -2,6 +2,7 @@
 package io.github.yixing233.hyperduo;
 
 import java.util.HashSet;
+import java.util.Collection;
 import java.util.Set;
 
 /** ROM-independent rules used by the ColorOS adapter. */
@@ -120,7 +121,7 @@ final class ColorOsPolicy {
     static final class SlotOwnership {
         private final Set<String> added = new HashSet<>();
 
-        boolean sync(Set<String> nativeSlots, Set<String> requested) {
+        boolean sync(Collection<String> nativeSlots, Set<String> requested) {
             boolean changed = false;
             for (String slot : new HashSet<>(added)) {
                 if (!requested.contains(slot)) {
@@ -129,7 +130,7 @@ final class ColorOsPolicy {
                 }
             }
             for (String slot : requested) {
-                if (nativeSlots.add(slot)) {
+                if (!nativeSlots.contains(slot) && nativeSlots.add(slot)) {
                     added.add(slot);
                     changed = true;
                 }

@@ -99,8 +99,10 @@ final class OutRingLayout {
         while (true) {
             total = Math.max(0, outwardGap);
             tallest = 0;
+            int remaining = 0;
             for (int i = 0; i < widths.length; i++) {
                 if (!dropped[i]) {
+                    remaining++;
                     total += widths[i] + Math.max(0, gaps[i]);
                     tallest = Math.max(tallest, heights[i]);
                 }
@@ -109,7 +111,8 @@ final class OutRingLayout {
             // views are about one row tall, so dropping one would not make the rest shorter.
             final boolean fitsWidth = total <= room;
             final boolean fitsHeight = tallest <= height;
-            if ((fitsWidth && fitsHeight) || dropLowest(dropped, dropOrder)) {
+            if (remaining == 0) total = 0;
+            if ((fitsWidth && fitsHeight) || remaining <= 1 || !dropLowest(dropped, dropOrder)) {
                 break;
             }
         }

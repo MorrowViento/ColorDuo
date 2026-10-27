@@ -29,6 +29,8 @@ final class TrioState {
     int level = 72;
     boolean charging;
     boolean quickCharging;
+    boolean chargingPaused;
+    int dataSlot = -1;
     boolean powerSave;
     boolean low;
     boolean wifiPresent = true;

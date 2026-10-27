@@ -78,6 +78,13 @@ public final class ColorOsPolicyTest {
         check(owner.sync(nativeSlots, Set.of()), "disable releases own wifi");
         check(nativeSlots.equals(Set.of("alarm_clock")), "disable retains unrelated system policy");
         check(!owner.sync(nativeSlots, Set.of()), "repeated disable is idempotent");
+        java.util.List<String> legacySlots = new java.util.ArrayList<>(java.util.List.of("wifi", "alarm_clock"));
+        ColorOsPolicy.SlotOwnership legacyOwner = new ColorOsPolicy.SlotOwnership();
+        check(legacyOwner.sync(legacySlots, Set.of("wifi", "mobile")), "list-backed ignored slots accept handoff");
+        check(!legacyOwner.sync(legacySlots, Set.of("wifi", "mobile")), "list-backed repeat does not duplicate");
+        check(legacySlots.size() == 3, "pre-existing list entries are not duplicated");
+        check(legacyOwner.sync(legacySlots, Set.of()), "list-backed ownership releases only our additions");
+        check(legacySlots.equals(java.util.List.of("wifi", "alarm_clock")), "existing native policy survives release");
         System.out.println("ColorOS network models, Wi-Fi resolution, signal normalization and slot restoration passed");
     }
 

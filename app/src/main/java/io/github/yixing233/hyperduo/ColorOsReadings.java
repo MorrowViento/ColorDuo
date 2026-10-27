@@ -22,6 +22,10 @@ final class ColorOsReadings extends ViewGroup {
     private final TrioHooks.OutTypeLabel type;
     private final int[] levels = new int[2];
     private TrioAppearance appearance;
+    private boolean radioNotice;
+    private boolean radioNoticeVisible;
+
+    boolean hasVisibleRadioNotice() { return radioNotice && radioNoticeVisible; }
 
     ColorOsReadings(Context context, TrioState state, View glyphHost) {
         super(context);
@@ -52,7 +56,7 @@ final class ColorOsReadings extends ViewGroup {
         // These are the same selection and drawing functions used by the upstream preview
         // and hooks, including a SIM in slot 2 alone and the data-SIM-only option.
         TrioRenderer.outSignalLevels(appearance.dataSimOnly, state.mobileLevel,
-                state.slotLevels, TrioState.sDataSlot, levels);
+                state.slotLevels, state.dataSlot, levels);
         if (levels[0] < 0) levels[0] = 0;
         signal.setVisibility(appearance.stackedOut() ? VISIBLE : GONE);
         signal.invalidate();
@@ -70,11 +74,13 @@ final class ColorOsReadings extends ViewGroup {
         }
         perf.setLineSpacing(0f, TrioHooks.perfLineSpacing(perf, performance, this));
 
-        String network = state.mobileType == null ? "" : state.mobileType;
+        radioNotice = appearance.foldsMobile() && DuoPolicy.hasNotice(state.mobileService);
+        String network = radioNotice ? ColorOsLabels.radioNotice(getContext(), state.mobileService)
+                : state.mobileType == null ? "" : state.mobileType;
         if (!network.contentEquals(type.getText()) || type.suffixScale != appearance.typeSuffixScale) {
             TrioHooks.applyOutTypeText(type, network, appearance.typeSuffixScale);
         }
-        type.setVisibility(appearance.typeOutOfRing && !network.isEmpty() ? VISIBLE : GONE);
+        type.setVisibility((radioNotice || appearance.typeOutOfRing) && !network.isEmpty() ? VISIBLE : GONE);
         size = appearance.outTypeSize * getResources().getDisplayMetrics().density;
         if (type.getTextSize() != size) type.setTextSize(TypedValue.COMPLEX_UNIT_PX, size);
         if (type.appliedWeight != appearance.typeWeight || type.fontGeneration != generation) {
@@ -126,8 +132,19 @@ final class ColorOsReadings extends ViewGroup {
                 ? (rtl ? margins[1] : margins[0]) : 0;
         // ColorOS measures this as a sibling of the weighted native icon container. The
         // parent reserves its width; MIUI instead reserves that width with icon padding.
+        int[] dropOrder = TrioHooks.outRingDropOrder(appearance);
+        if (radioNotice) {
+            // An explicit network warning takes priority over optional power and bars.
+            int typeIndex = -1;
+            for (int i = 0; i < views.length; i++) if (views[i] == type) typeIndex = i;
+            int[] priority = new int[dropOrder.length];
+            int at = 0;
+            for (int index : dropOrder) if (index != typeIndex) priority[at++] = index;
+            if (at < priority.length) priority[at] = typeIndex;
+            dropOrder = priority;
+        }
         return OutRingLayout.solve(width, 0, 0, 0, height, widths, heights, gaps,
-                outward, TrioHooks.outRingDropOrder(appearance));
+                outward, dropOrder);
     }
 
     @Override protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
@@ -156,6 +173,7 @@ final class ColorOsReadings extends ViewGroup {
         View[] views = orderedViews();
         OutRingLayout.Plan plan = plan(getWidth(), getHeight());
         boolean rtl = getLayoutDirection() == LAYOUT_DIRECTION_RTL;
+        boolean noticeVisible = false;
         for (int i = 0; i < views.length; i++) {
             View child = views[i];
             if (child == null || child.getVisibility() != VISIBLE) continue;
@@ -173,6 +191,11 @@ final class ColorOsReadings extends ViewGroup {
             child.setScaleX(plan.scale);
             child.setScaleY(plan.scale);
             child.layout(x, y, x + w, y + h);
+            if (child == type && radioNotice && plan.scale > 0f) noticeVisible = true;
+        }
+        if (radioNoticeVisible != noticeVisible) {
+            radioNoticeVisible = noticeVisible;
+            ColorOsHooks.invalidateHosts();
         }
     }
 

@@ -1,6 +1,6 @@
 # ColorDuo
 
-面向 **ColorOS 17** 的状态栏三合一图标模块，将电池、Wi-Fi 和移动信号整合为一个可配置的图标。
+面向 **ColorOS 17** 的仿 iPhone Duo 状态栏模块，将电池、Wi-Fi 和移动信号整合为一个可配置的图标。
 
 完全由 Codex 维护，fork 自 [HyperDuo](https://github.com/yixing233/HyperDuo)。
 

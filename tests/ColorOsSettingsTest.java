@@ -51,6 +51,8 @@ public final class ColorOsSettingsTest {
         check(Arrays.equals(reading, new int[] {4, 2}), "dual readings retain each card's level");
         TrioRenderer.outSignalLevels(true, 2, new int[] {4, 2}, 1, reading);
         check(Arrays.equals(reading, new int[] {2, -1}), "data-SIM-only selects the actual data slot");
+        TrioRenderer.outSignalLevels(false, 2, new int[] {4, 2}, 1, reading);
+        check(Arrays.equals(reading, new int[] {2, 4}), "automatic rows put the data line first");
 
         BufferedImage image = new BufferedImage(240, 200, BufferedImage.TYPE_INT_ARGB);
         Graphics2D graphics = image.createGraphics();
@@ -63,7 +65,61 @@ public final class ColorOsSettingsTest {
             if ((image.getRGB(x, y) >>> 24) != 0) ink++;
         }
         check(ink > 1000, "configured upstream dual-card ring paints visible artwork");
-        System.out.println("Upstream defaults, settings transport, dual-card selection and ring rendering passed");
+        TrioState live = new TrioState();
+        live.level = 65;
+        live.wifiPresent = false;
+        live.slotLevels = new int[] {4, 1};
+        live.mobileLevel = 1;
+        live.dataSlot = 1;
+        TrioSettings automatic = fresh.copy();
+        automatic.trioStyle = Prefs.STYLE_RECT;
+        automatic.dualSim = true;
+        BufferedImage dataSecond = render(live, automatic);
+        live.slotLevels = new int[] {1, 4};
+        live.dataSlot = 0;
+        check(equal(dataSecond, render(live, automatic)), "live rendering follows data line, not physical index");
+
+        live.slotLevels = new int[] {4, 1};
+        live.dataSlot = 0;
+        BufferedImage namedRing = render(live, dual);
+        live.dataSlot = 1;
+        check(equal(namedRing, render(live, dual)), "explicit ring SIM components never swap identities");
+        TrioSettings capsule = dual.copy();
+        capsule.trioStyle = Prefs.STYLE_CAPSULE;
+        TrioAppearance.Capsule cap = TrioAppearance.of(capsule).capsule(65, false, -1, "", 2);
+        check(TrioRenderer.capsuleSignalLevel(cap, TrioZones.Zone.TOP, new int[]{4,1}, 1) == 4,
+                "named SIM 1 capsule band keeps its physical reading");
+        check(TrioRenderer.capsuleSignalLevel(cap, TrioZones.Zone.BOTTOM, new int[]{4,1}, 4) == 1,
+                "named SIM 2 capsule band keeps its physical reading");
+        BufferedImage namedCapsule = render(live, capsule);
+        live.dataSlot = 0;
+        check(equal(namedCapsule, render(live, capsule)), "manual capsule rows survive a data-line switch");
+
+        live.charging = true;
+        live.quickCharging = true;
+        BufferedImage charging = render(live, dual);
+        live.chargingPaused = true;
+        BufferedImage paused = render(live, dual);
+        int gray = 0;
+        for (int y=0; y<paused.getHeight(); y++) for (int x=0; x<paused.getWidth(); x++) {
+            if (paused.getRGB(x,y) == 0xff8e8e93) gray++;
+        }
+        check(gray > 100 && !equal(charging, paused), "paused state actually paints neutral gray");
+        live.chargingPaused = false;
+        check(equal(charging, render(live, dual)), "resume restores the exact charging appearance");
+        System.out.println("Settings migration, named SIM identity, data-line order and paused rendering passed");
+    }
+
+    private static BufferedImage render(TrioState state, TrioSettings settings) {
+        BufferedImage result = new BufferedImage(240,200,BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics = result.createGraphics();
+        try { TrioRenderer.drawState(new Canvas(graphics),240,200,state,settings); }
+        finally { graphics.dispose(); }
+        return result;
+    }
+
+    private static boolean equal(BufferedImage left, BufferedImage right) {
+        return Arrays.equals(left.getRGB(0,0,240,200,null,0,240), right.getRGB(0,0,240,200,null,0,240));
     }
 
     private static void check(boolean value, String message) {

@@ -10,7 +10,7 @@
 | 仓库 | `chorusfruit-233/ColorDuo` |
 | 应用 ID | `io.github.chorusfruit_233.colorduo` |
 | 源码 namespace | `io.github.yixing233.hyperduo`，沿用共享源码的命名 |
-| 当前版本 | `0.1.1` / `10008` |
+| 当前版本 | `0.2.0` / `10009` |
 | compileSdk / targetSdk / minSdk | 37 / 36 / 29 |
 | 框架 API | libxposed 102 |
 | 作用域 | `com.android.systemui` |
@@ -41,6 +41,7 @@ Windows 可使用 `gradlew.bat --no-daemon :app:assembleDebug`。首次构建需
 | `ColorOsHooks.java` | ColorOS 视图接管、原生更新跟踪、状态流捕获与恢复 |
 | `ColorOsPolicy.java` | 模型解析、信号换算、参考固件电流单位及 slot 所有权规则 |
 | `ColorOsBattery.java` | 只读检测 Oplus 串联电芯数量、选择整包电压并归一化功率输入 |
+| `DuoPolicy.java` / `ColorOsRadio.java` | Duo 状态规则、默认数据卡顺序及各状态栏实例共享的限频电话服务采样 |
 | `ColorOsLayout.java` | 主状态栏、锁屏与通知/QS 头部的本地容器关联，隔离各行图标 |
 | `ColorOsReadings.java` | 在 ColorOS 原生布局中挂载环外读数组，复用共享绘制与排版函数 |
 | `BatteryPresence.java` / `WifiPresence.java` | 框架状态采样；电流在采样入口进行 ROM 单位适配 |
@@ -59,6 +60,7 @@ Windows 可使用 `gradlew.bat --no-daemon :app:assembleDebug`。首次构建需
 
 ```sh
 python3 tests/upstream-parity.py
+python3 tests/duo-policy.py
 sh tests/coloros-policy.sh
 sh tests/coloros-settings.sh
 python3 tests/coloros-power.py
@@ -68,9 +70,9 @@ python3 tests/module-publish.py
 ./gradlew --no-daemon :app:assembleDebug
 ```
 
-前五组离线检查覆盖共享源码基线、ColorOS 原生模型与图标交接、配置与绘图、实际电流样本到功率格式化，以及多页面电池接管和恢复。跨页面检查执行生产 Host 的接管、恢复与读数挂载方法，并检查独立行及视图迁移；不模拟真实 GPU、SystemUI 动画或 ROM 生命周期。发布元数据检查另行覆盖版本输入、更新记录、模块入口、签名拒绝及用户名规范化。Python 检查需要 Python 3，Java 检查使用 JDK 21。`upstream-parity.py` 读取固定基线提交，CI 使用完整提交历史。
+八组离线检查覆盖未演进的继承源码、Duo 状态与电话服务采样、原生模型与图标交接、配置和实际绘图、整包功率、多页面宿主恢复，以及两组发布检查。警告布局检查执行生产空间分配和可见性方法，覆盖窄宽度、零宽度、重排序及恢复。跨页面检查执行生产 Host 接管、恢复与读数挂载；不模拟真实 GPU、SystemUI 动画或 ROM 生命周期。Python 检查需要 Python 3，Java 检查使用 JDK 21。
 
-共享规则当前继承自 HyperDuo `e9dffbcc8f65a5f3dc379c0b25ccdc0462a8a28d`。一致性检查允许独立应用标识、刷新分发、别名定位、辅助函数访问和采样单位适配，保护现有绘图、布局、迁移及功率公式。ColorOS 系统差异在适配层维护。
+来源基线为 HyperDuo `e9dffbcc8f65a5f3dc379c0b25ccdc0462a8a28d`。`upstream-parity.py` 保护 21 个未演进文件，6 个 Duo 行为文件在明确列出的范围内自主维护，并由行为和绘图回归覆盖；默认值、旧配置迁移及共享功率公式继续保留。对齐依据和设备验证边界见 [适配记录](COLOROS17.md#020duo-状态语义)。
 
 `tests/` 中其他 PowerShell 脚本继承自上游，记录了不同时间的接口与环境。ColorDuo 当前检查入口为以上检查和 [CI 工作流](../.github/workflows/build.yml)。源码或构建检查通过后，仍需按 [真机验收项目](COLOROS17.md#第一轮真机验收) 记录目标固件表现。
 

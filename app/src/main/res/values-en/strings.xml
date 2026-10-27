@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="duo_no_sim">No SIM</string>
+    <string name="duo_no_service">No Service</string>
+    <string name="duo_emergency_only">SOS</string>
+    <string name="drawing_scene_paused">Charging paused</string>
     <string name="drawing_master_title">Master switch</string>
     <string name="drawing_quick_edit_title">Quick edit</string>
     <string name="drawing_order_title">Component order</string>

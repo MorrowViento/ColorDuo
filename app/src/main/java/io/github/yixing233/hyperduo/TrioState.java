@@ -213,6 +213,7 @@ final class TrioState {
     int level = -1;
     boolean charging;
     boolean quickCharging;
+    boolean chargingPaused;
     boolean low;
     boolean powerSave;
     boolean performanceMode;
@@ -238,6 +239,8 @@ final class TrioState {
     // Signal levels (shared).
     int wifiLevel = -1;
     int mobileLevel = -1;
+    int dataSlot = -1;
+    DuoPolicy.Radio mobileService = DuoPolicy.Radio.UNKNOWN;
     boolean wifiPresent = true;
     boolean islandHideBattery;
     String mobileType = "";
@@ -309,6 +312,7 @@ final class TrioState {
         // on refresh(), so there is nothing to mirror them into here.
 
         final int[] slots = sSlotLevels;
+        dataSlot = sDataSlot;
         slotLevels = new int[] { slots[0], slots[1] };
         sims = (slots[0] >= 0 ? 1 : 0) + (slots[1] >= 0 ? 1 : 0);
 

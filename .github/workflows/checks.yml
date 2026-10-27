@@ -20,8 +20,10 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Upstream behavior parity
+      - name: Unchanged upstream inheritance
         run: python3 tests/upstream-parity.py
+      - name: iPhone Duo state rules
+        run: python3 tests/duo-policy.py
       - name: ColorOS ownership and signals
         run: sh tests/coloros-policy.sh
       - name: Ring rendering and settings

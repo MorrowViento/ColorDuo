@@ -5,7 +5,7 @@
 | 工作流 | 用途 |
 | --- | --- |
 | [Build ColorDuo](../.github/workflows/build.yml) | main 的代码推送、PR 和手动触发；检查通过后构建测试包 |
-| [Checks](../.github/workflows/checks.yml) | 两种构建共用的五组行为回归、发布素材及模块仓发布检查，不安装 Android SDK |
+| [Checks](../.github/workflows/checks.yml) | 两种构建共用的八组继承代码、行为回归及发布检查，不安装 Android SDK |
 | [Prepare release](../.github/workflows/release.yml) | 手动构建私有签名的 release APK，上传发布素材并创建本仓库 Release 草稿 |
 | [Publish to module repository](../.github/workflows/module.yml) | 复用公开签名 APK，申请模块仓、接受邀请、同步介绍并发布同一文件 |
 

@@ -277,7 +277,7 @@ final class TrioRenderer {
         }
         drawInto(canvas, w, h, s.level, s.charging, s.quickCharging, s.powerSave, s.low,
                 s.wifiPresent ? s.wifiLevel : -1, s.mobileLevel, s.slotLevels, s.mobileType,
-                s.foreground(), cfg, true, s.wifiPresent);
+                s.foreground(), cfg, true, s.wifiPresent, s.dataSlot, s.chargingPaused);
     }
 
     /**
@@ -327,8 +327,24 @@ final class TrioRenderer {
                          int wifiLevel, int mobileLevel, int[] slotLevels, String mobileType,
                          int fg, TrioSettings cfg, boolean clearWhenDone,
                          boolean wifiConnected) {
+        drawInto(canvas, w, h, level, charging, quickCharging, powerSave, low,
+                wifiLevel, mobileLevel, slotLevels, mobileType, fg, cfg, clearWhenDone,
+                wifiConnected, 0, false);
+    }
+
+    static void drawInto(Canvas canvas, int w, int h, int level, boolean charging,
+                         boolean quickCharging, boolean powerSave, boolean low,
+                         int wifiLevel, int mobileLevel, int[] slotLevels, String mobileType,
+                         int fg, TrioSettings cfg, boolean clearWhenDone,
+                         boolean wifiConnected, int dataSlot, boolean chargingPaused) {
         if (w <= 0 || h <= 0 || cfg == null) {
             return;
+        }
+        if (chargingPaused) {
+            // Keep the charging layout and bolt, with a neutral paused-charge appearance.
+            charging = true;
+            quickCharging = false;
+            fg = DuoPolicy.pausedColor(fg);
         }
         // Resolve what is on screen once, here, from the single rule source. The
         // layout methods below read positions off it instead of re-deriving the
@@ -382,7 +398,7 @@ final class TrioRenderer {
             canvas.drawColor(0, PorterDuff.Mode.CLEAR);
         }
 
-        final int role = roleColor(appearance, level, charging, powerSave, low, fg);
+        final int role = chargingPaused ? fg : roleColor(appearance, level, charging, powerSave, low, fg);
 
         // A slot with no reading counts as absent, so a single-SIM device - or a
         // poll that has not answered yet - is not mistaken for a second SIM.
@@ -397,10 +413,10 @@ final class TrioRenderer {
 
         if (capsule) {
             drawCapsuleLayout(canvas, level, charging, quickCharging, wifiLevel, mobileLevel, shownType,
-                    slots, sims, role, fg, appearance, wifiConnected);
+                    slots, sims, role, fg, appearance, wifiConnected, dataSlot);
         } else if (rect) {
             drawRectLayout(canvas, level, charging, quickCharging, wifiLevel, mobileLevel,
-                    slots, sims, shownType, role, fg, appearance);
+                    DuoPolicy.automaticLevels(slots, dataSlot), sims, shownType, role, fg, appearance);
         } else {
             drawRingLayout(canvas, level, charging, quickCharging, wifiLevel, mobileLevel,
                     slots, sims, shownType, role, fg, appearance, wifiConnected);
@@ -697,7 +713,7 @@ final class TrioRenderer {
     private static void drawCapsuleLayout(Canvas canvas, int level, boolean charging,
                                           boolean quickCharging, int wifiLevel, int mobileLevel, String mobileType,
                                           int[] slotLevels, int sims, int role, int fg,
-                                          TrioAppearance a, boolean wifiConnected) {
+                                          TrioAppearance a, boolean wifiConnected, int dataSlot) {
         final float stroke = a.ringStroke * TrioGeometry.CAP_STROKE_RATIO;
         final TrioAppearance.Capsule cap =
                 a.capsule(level, charging, wifiLevel, mobileType, sims, wifiConnected);
@@ -725,7 +741,7 @@ final class TrioRenderer {
         }
 
         if (cap.dots) {
-            drawCapsuleDots(canvas, mobileLevel, slotLevels, cap.dual, stroke, fg, a, cap);
+            drawCapsuleDots(canvas, mobileLevel, slotLevels, cap.dual, stroke, fg, a, cap, dataSlot);
         }
 
         // The left column is a BODY slot - the interior's own height budget, which is -1 in
@@ -1144,11 +1160,14 @@ final class TrioRenderer {
      */
     private static void drawCapsuleDots(Canvas c, int level, int[] slotLevels, boolean dual,
                                         float stroke, int fg, TrioAppearance a,
-                                        TrioAppearance.Capsule cap) {
+                                        TrioAppearance.Capsule cap, int dataSlot) {
         final boolean topRow = cap == null || cap.dotsIn(TrioZones.Zone.TOP);
         final boolean bottomRow = cap == null || cap.dotsIn(TrioZones.Zone.BOTTOM);
-        final int top = (dual && slotLevels != null) ? slotLevels[0] : level;
-        final int bottom = (dual && slotLevels != null) ? slotLevels[1] : level;
+        final int[] automatic = DuoPolicy.automaticLevels(slotLevels, dataSlot);
+        final int top = capsuleSignalLevel(cap, TrioZones.Zone.TOP, slotLevels,
+                dual && automatic != null ? automatic[0] : level);
+        final int bottom = capsuleSignalLevel(cap, TrioZones.Zone.BOTTOM, slotLevels,
+                dual && automatic != null ? automatic[1] : level);
         final int inactive = withAlpha(fg, a.trackAlpha);
         final int topActive = top < 0 ? 0 : Math.min(TrioGeometry.RECT_DOT_ROWS, top);
         final int bottomActive = bottom < 0 ? 0 : Math.min(TrioGeometry.RECT_DOT_ROWS, bottom);
@@ -1168,6 +1187,16 @@ final class TrioRenderer {
                 c.drawCircle(x, bottomY, TrioGeometry.CAP_DOT_R, FILL);
             }
         }
+    }
+
+    static int capsuleSignalLevel(TrioAppearance.Capsule cap, TrioZones.Zone zone,
+                                  int[] physicalLevels, int automatic) {
+        if (cap == null) return automatic;
+        int part = cap.dotParts[zone.ordinal()];
+        if (part == Prefs.PART_SIM_1 || part == Prefs.PART_SIM_2) {
+            return physicalLevels == null ? -1 : physicalLevels[part == Prefs.PART_SIM_1 ? 0 : 1];
+        }
+        return automatic;
     }
 
     /** The time of day, in a capsule cell centred on {@code (cx, cy)}. */
@@ -1618,8 +1647,9 @@ final class TrioRenderer {
                 bars = slot1;
             }
         } else if (slot0 >= 0 && slot1 >= 0) {
-            bars = slot0;
-            dots = slot1;
+            boolean secondIsData = DuoPolicy.primarySlot(dataSlot, slotLevels) == 1;
+            bars = secondIsData ? slot1 : slot0;
+            dots = secondIsData ? slot0 : slot1;
         } else {
             bars = firstAnswered;
         }

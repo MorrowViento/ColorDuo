@@ -127,6 +127,9 @@ final class BatteryPresence {
             final boolean attached = plugged != 0
                     || status == BatteryManager.BATTERY_STATUS_CHARGING
                     || status == BatteryManager.BATTERY_STATUS_FULL;
+            // ColorOS readouts follow actual charging, not merely an attached cable.
+            final boolean readoutActive = ColorOsHooks.isInstalled()
+                    ? ColorOsHooks.batteryStatus(status, plugged) : attached;
             final int whole = (temperature == Integer.MIN_VALUE)
                     ? TrioState.TEMP_UNKNOWN
                     : Math.round(temperature / 10f);
@@ -139,7 +142,7 @@ final class BatteryPresence {
                 powerVoltage = sample.voltageMilliVolts;
             }
             final float watts = wattsOf(current, powerVoltage);
-            publish(attached, watts, whole);
+            publish(readoutActive, watts, whole);
         } catch (RuntimeException ignored) {
             // Permissions/ROM differences must not crash SystemUI.
         }

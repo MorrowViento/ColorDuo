@@ -16,9 +16,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.os.SystemClock;
-import android.provider.Settings;
 import android.telephony.SubscriptionInfo;
-import android.telephony.SubscriptionManager;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
@@ -90,6 +88,19 @@ final class ColorOsHooks {
     static boolean isInstalled() { return installed; }
 
     private static final ColorOsBattery BATTERY_SAMPLER = new ColorOsBattery();
+    private static final ColorOsRadio RADIO_SAMPLER = new ColorOsRadio();
+    private static volatile DuoPolicy.Charge observedCharge = DuoPolicy.Charge.UNKNOWN;
+
+    static boolean batteryStatus(int status, int plugged) {
+        DuoPolicy.Charge next = DuoPolicy.charge(status, plugged);
+        if (next != observedCharge) {
+            observedCharge = next;
+            TrioHooks.log(TrioHooks.LOG_INFO, "ColorOS charging: state=" + next
+                    + " status=" + status + " plugged=" + plugged);
+            invalidateHosts();
+        }
+        return next == DuoPolicy.Charge.CHARGING;
+    }
 
     /** Normalize current units and per-cell voltage before the shared upstream calculation. */
     static ColorOsBattery.Sample batterySample(int reported, int voltageMilliVolts) {
@@ -707,9 +718,12 @@ final class ColorOsHooks {
             if (charge == null && viewModel != null) {
                 charge = Refl.get(Refl.field(viewModel.getClass(), "chargeState"), viewModel);
             }
-            state.charging = bool(Refl.callByName(charge, "getCharging"), TrioState.sChargingAttached);
-            state.quickCharging = bool(Refl.callByName(charge, "getSuperVoocCharging"), false)
-                    || bool(Refl.callByName(charge, "getWirelessVoocCharging"), false);
+            state.charging = observedCharge == DuoPolicy.Charge.UNKNOWN
+                    ? bool(Refl.callByName(charge, "getCharging"), TrioState.sChargingAttached)
+                    : observedCharge == DuoPolicy.Charge.CHARGING;
+            state.chargingPaused = observedCharge == DuoPolicy.Charge.PAUSED;
+            state.quickCharging = state.charging && (bool(Refl.callByName(charge, "getSuperVoocCharging"), false)
+                    || bool(Refl.callByName(charge, "getWirelessVoocCharging"), false));
             state.powerSave = bool(value(savingFlow), bool(Refl.get(
                     Refl.field(viewModel == null ? null : viewModel.getClass(), "isSavingMode"), viewModel), false));
             state.low = state.level >= 0 && state.level <= 15;
@@ -748,17 +762,21 @@ final class ColorOsHooks {
             state.slotLevels = TrioState.sSlotLevels.clone();
             state.mobileLevel = -1;
             state.mobileType = "";
-            if (Settings.Global.getInt(context.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0) != 0) {
+            ColorOsRadio.Sample radio = RADIO_SAMPLER.sample(context, now);
+            state.dataSlot = radio.dataSlot;
+            state.mobileService = radio.radio;
+            if (radio.radio == DuoPolicy.Radio.AIRPLANE || radio.radio == DuoPolicy.Radio.NO_SIM) {
                 state.slotLevels = new int[] {-1, -1};
                 state.sims = 0;
                 TrioState.setMobileType("");
+                noteMobile();
                 return;
             }
-            int dataId = SubscriptionManager.getDefaultDataSubscriptionId();
+            int dataId = radio.dataId;
             try {
-                SubscriptionManager manager = context.getSystemService(SubscriptionManager.class);
-                List<SubscriptionInfo> subscriptions = manager == null ? null : manager.getActiveSubscriptionInfoList();
+                List<SubscriptionInfo> subscriptions = radio.subscriptions;
                 if (subscriptions != null) for (SubscriptionInfo subscription : subscriptions) {
+                    if (subscription == null) continue;
                     int id = subscription.getSubscriptionId();
                     int slot = subscription.getSimSlotIndex();
                     if (slot < 0 || slot >= state.slotLevels.length) continue;
@@ -773,19 +791,35 @@ final class ColorOsHooks {
                         // Satellite models share the icon channel, but are not cellular bars.
                         state.slotLevels[slot] = -1;
                     }
+                    if (DuoPolicy.hasNotice(radio.services[slot])) state.slotLevels[slot] = 0;
                     if (id == dataId || (dataId < 0 && state.mobileLevel < 0)) {
                         state.mobileLevel = state.slotLevels[slot];
                         state.mobileType = mobile == null ? "" : mobile.networkType();
+                        if (state.dataSlot < 0) state.dataSlot = slot;
+                        if (state.mobileService == DuoPolicy.Radio.UNKNOWN && mobile != null) {
+                            Object service = value(mobile.inService);
+                            if (service instanceof Boolean) state.mobileService = (Boolean) service
+                                    ? DuoPolicy.Radio.AVAILABLE : DuoPolicy.Radio.NO_SERVICE;
+                        }
                     }
                 }
             } catch (RuntimeException error) {
                 if (TrioConfig.debugLog()) TrioHooks.log(TrioHooks.LOG_WARN, "ColorOS telephony: " + error);
             }
             state.sims = (state.slotLevels[0] >= 0 ? 1 : 0) + (state.slotLevels[1] >= 0 ? 1 : 0);
+            if (DuoPolicy.hasNotice(state.mobileService)) {
+                state.mobileLevel = 0;
+                state.mobileType = "";
+            }
             TrioState.setMobileType(state.mobileType);
+            noteMobile();
+        }
+
+        private void noteMobile() {
             if (TrioConfig.debugLog()) {
                 String note = "ColorOS mobile: models=" + MOBILES.size() + " dataSlot=" + TrioState.sDataSlot
-                        + " levels=" + java.util.Arrays.toString(state.slotLevels) + " type=" + state.mobileType;
+                        + " levels=" + java.util.Arrays.toString(state.slotLevels) + " type=" + state.mobileType
+                        + " service=" + state.mobileService + " primarySlot=" + state.dataSlot;
                 if (!note.equals(lastMobileNote)) {
                     lastMobileNote = note;
                     TrioHooks.log(TrioHooks.LOG_INFO, note);
@@ -794,14 +828,16 @@ final class ColorOsHooks {
         }
 
         @SuppressWarnings("unchecked")
-        void updateSlots(Set<String> wanted) {
-            if (iconContainer == null) return;
+        boolean updateSlots(Set<String> wanted) {
+            if (iconContainer == null) return wanted.isEmpty();
             Object ignored = Refl.get(Refl.field(iconContainer.getClass(), "mIgnoredSlots"), iconContainer);
-            if (!(ignored instanceof Set)) return;
-            if (slots.sync((Set<String>) ignored, wanted)) {
+            if (!(ignored instanceof java.util.Collection)) return false;
+            java.util.Collection<String> ignoredSlots = (java.util.Collection<String>) ignored;
+            if (slots.sync(ignoredSlots, wanted)) {
                 iconContainer.requestLayout();
                 Refl.callByName(iconContainer, "updateStates");
             }
+            return ignoredSlots.containsAll(wanted);
         }
 
         void releaseSlots() { updateSlots(Collections.emptySet()); }
@@ -829,7 +865,9 @@ final class ColorOsHooks {
                 if (!(slot instanceof String)) continue;
                 if (slot.equals("wifi") && appearance.ownsWifi() && state.wifiLevel >= 0) wanted.add((String) slot);
                 if (slot.equals("mobile") || slot.equals("stacked_mobile")) {
-                    if (appearance.foldsMobile() && state.sims > 0) wanted.add((String) slot);
+                    boolean noticeVisible = extra != null && extra.hasVisibleRadioNotice();
+                    if (DuoPolicy.foldMobile(appearance.foldsMobile(), state.sims,
+                            state.mobileService, noticeVisible)) wanted.add((String) slot);
                     // Upstream also hands off the RAT label when bars remain native.
                     // Track only these children; never hide the whole radio for a type label.
                     for (String name : new String[] {"mobile_type_text", "mobile_type_image"}) {
@@ -841,15 +879,16 @@ final class ColorOsHooks {
                             CHILDREN.put(type, new WeakReference<>(this));
                         }
                         nativeTypes.add(type);
-                        hide(type, appearance.ownsType());
+                        hide(type, appearance.ownsType()
+                                && (!DuoPolicy.hasNotice(state.mobileService) || noticeVisible));
                     }
                 }
             }
-            updateSlots(wanted);
+            boolean applied = updateSlots(wanted);
             if (TrioConfig.debugLog()) {
                 String note = "ColorOS wifi handoff: owns=" + appearance.ownsWifi()
                         + " level=" + state.wifiLevel + " container=" + (iconContainer != null)
-                        + " requested=" + wanted;
+                        + " requested=" + wanted + " applied=" + applied;
                 if (!note.equals(lastWifiHandoff)) {
                     lastWifiHandoff = note;
                     TrioHooks.log(TrioHooks.LOG_INFO, note);

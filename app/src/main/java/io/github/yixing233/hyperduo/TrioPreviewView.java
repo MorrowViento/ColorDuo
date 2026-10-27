@@ -57,6 +57,14 @@ public final class TrioPreviewView extends View {
     private int level = 72;
     private boolean charging;
     private boolean quickCharging;
+    private boolean chargingPaused;
+
+    public void setChargingPaused(boolean paused) {
+        if (chargingPaused != paused) {
+            chargingPaused = paused;
+            invalidate();
+        }
+    }
     private boolean powerSave;
     private boolean low;
     private int wifiLevel = 3;
@@ -389,7 +397,7 @@ public final class TrioPreviewView extends View {
             // scene it is not a conflation: nothing else knows.
             TrioRenderer.drawInto(canvas, innerW, innerH, level, charging, quickCharging,
                     powerSave, low, wifiLevel, mobileLevel, slotLevels, mobileType, foreground,
-                    settings, false, wifiLevel >= 0);
+                    settings, false, wifiLevel >= 0, 0, chargingPaused);
         }
         canvas.restoreToCount(save);
 

@@ -173,10 +173,12 @@ private enum class PreviewScene(
     val low: Boolean = false,
     val wifiLevel: Int = WIFI_ON_LEVEL,
     val slotLevels: IntArray? = null,
+    val chargingPaused: Boolean = false,
 ) {
     Normal(R.string.drawing_scene_normal, 64),
     Charging(R.string.drawing_scene_charging, 88, charging = true),
     QuickCharging(R.string.drawing_scene_quick, 88, charging = true, quickCharging = true),
+    ChargingPaused(R.string.drawing_scene_paused, 88, charging = true, chargingPaused = true),
     Low(R.string.drawing_scene_low, 24, powerSave = true, low = true),
     Critical(R.string.drawing_scene_critical, 12, low = true),
     NoWifi(R.string.drawing_scene_no_wifi, 79, wifiLevel = NO_WIFI_LEVEL),
@@ -800,6 +802,7 @@ private fun applyPreviewState(
     view.setForeground(if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt())
     view.setState(scene.level, scene.charging, scene.quickCharging, scene.powerSave,
         scene.low, scene.wifiLevel, MOBILE_LEVEL, scene.previewSlots, PREVIEW_TYPE)
+    view.setChargingPaused(scene.chargingPaused)
 }
 
 @Composable

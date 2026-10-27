@@ -1230,6 +1230,8 @@ public final class TrioAppearance {
          * openings are independent, so a user can draw SIM 1 at the top and nothing below.
          */
         public final boolean[] dotBands;
+        /** Explicit SIM identity retained after a dot band releases its text occupant. */
+        public final int[] dotParts;
         /**
          * Per-cell occupants, indexed by {@link TrioZones.Zone#ordinal}, or
          * {@code PART_NONE} for a cell that draws nothing.
@@ -1240,6 +1242,7 @@ public final class TrioAppearance {
                         String mobileType, int sims, boolean wifiConnected) {
             parts = new int[Prefs.ZONE_COUNT];
             dotBands = new boolean[Prefs.ZONE_COUNT];
+            dotParts = new int[Prefs.ZONE_COUNT];
 
             // Every band is a real cell now: the two openings hold either a reading or a dot
             // row, and only the interior is a reading's alone.
@@ -1257,6 +1260,7 @@ public final class TrioAppearance {
             }
             for (TrioZones.Zone band : TrioZones.Zone.values()) {
                 dotBands[band.ordinal()] = isDotRow(parts[band.ordinal()]);
+                dotParts[band.ordinal()] = parts[band.ordinal()];
             }
 
             // The left column comes from the layout's own section. The legacy

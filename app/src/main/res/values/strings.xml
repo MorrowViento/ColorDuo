@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="duo_no_sim">无 SIM 卡</string>
+    <string name="duo_no_service">无服务</string>
+    <string name="duo_emergency_only">SOS</string>
+    <string name="drawing_scene_paused">充电暂停</string>
     <string name="app_name">ColorDuo</string>
     <string name="xposed_description">把状态栏的 Wi-Fi、移动信号与电池合并为一个仿 iPhone Duo 的三合一体图标。</string>
 

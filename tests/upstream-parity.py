@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Guard the shared product behavior against the verified upstream commit."""
+"""Protect unchanged inherited code; intentional Duo behavior has executable regressions."""
 from pathlib import Path
 import subprocess
 import sys
@@ -9,6 +9,14 @@ UPSTREAM = "e9dffbcc8f65a5f3dc379c0b25ccdc0462a8a28d"
 SOURCE = "app/src/main/java/io/github/yixing233/hyperduo/"
 # These files implement ROM/framework integration or the fork's update address.
 PLATFORM_FILES = {"HyperDuoModule.java", "WifiPresence.java", "ui/UpdateController.kt"}
+DUO_FILES = {
+    "TrioState.java",             # Explicit pause, service and default-data state.
+    "TrioRenderer.java",          # Paused styling and automatic data-line order.
+    "TrioAppearance.java",        # Retain physical SIM identity in capsule bands.
+    "TrioPreviewView.java",       # Preview the same paused rendering path.
+    "ui/DrawingScreen.kt",        # Charging-paused preview scene.
+    "OutRingLayout.java",         # Recompute reserve after dropping optional readings.
+}
 EXPOSED_HELPERS = (
     "static final class OutTypeLabel",
     "static final class PerfLabel",
@@ -50,6 +58,12 @@ def normalize(name, data):
                                 ("    private " + signature).encode())
     if name == "BatteryPresence.java":
         data = data.replace(
+            b"            // ColorOS readouts follow actual charging, not merely an attached cable.\n"
+            b"            final boolean readoutActive = ColorOsHooks.isInstalled()\n"
+            b"                    ? ColorOsHooks.batteryStatus(status, plugged) : attached;\n", b"")
+        data = data.replace(b"            publish(readoutActive, watts, whole);\n",
+                            b"            publish(attached, watts, whole);\n")
+        data = data.replace(
             b"            int current = currentNow(context);\n"
             b"            int powerVoltage = voltage;\n"
             b"            // Normalize ROM input units and pack voltage before the shared calculation.\n"
@@ -72,7 +86,7 @@ checked = 0
 failures = []
 for path in files:
     name = path.removeprefix(SOURCE)
-    if name in PLATFORM_FILES:
+    if name in PLATFORM_FILES or name in DUO_FILES:
         continue
     upstream = git("show", f"{UPSTREAM}:{path}")
     current = (ROOT / path).read_bytes()
@@ -81,4 +95,5 @@ for path in files:
     checked += 1
 if failures:
     sys.exit("Shared behavior differs from upstream:\n" + "\n".join(failures))
-print(f"Upstream parity passed: {checked} shared source files match {UPSTREAM[:7]}")
+print(f"Inherited-code guard passed: {checked} unchanged files match {UPSTREAM[:7]}; "
+      f"{len(DUO_FILES)} Duo behavior files are covered by focused regressions")
