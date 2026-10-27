@@ -17,6 +17,13 @@ public final class DuoPolicy {
         return Charge.UNKNOWN;
     }
 
+    /** Native PLC bypass is independent of Android's status, which can remain CHARGING. */
+    static Charge charge(int status, int plugged, Boolean bypass) {
+        // Oplus PLC applies to wired power (AC=1, USB=2). Ignore stale PLC on wireless or unplugged.
+        if ((plugged & 3) != 0 && Boolean.TRUE.equals(bypass)) return Charge.PAUSED;
+        return charge(status, plugged);
+    }
+
     // ServiceState: a working packet-data registration is service even without voice.
     static Radio service(int voiceRegistration, int dataRegistration, Boolean emergencyOnly) {
         return service(voiceRegistration, dataRegistration, emergencyOnly, null);

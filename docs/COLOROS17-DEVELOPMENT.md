@@ -10,7 +10,7 @@
 | 仓库 | `chorusfruit-233/ColorDuo` |
 | 应用 ID | `io.github.chorusfruit_233.colorduo` |
 | 源码 namespace | `io.github.yixing233.hyperduo`，沿用共享源码的命名 |
-| 当前版本 | `0.2.3` / `10012` |
+| 当前版本 | `0.2.4` / `10013` |
 | compileSdk / targetSdk / minSdk | 37 / 36 / 29 |
 | 框架 API | libxposed 102 |
 | 作用域 | `com.android.systemui` |
@@ -41,6 +41,7 @@ Windows 可使用 `gradlew.bat --no-daemon :app:assembleDebug`。首次构建需
 | `ColorOsHooks.java` | ColorOS 视图接管、原生更新跟踪、状态流捕获与恢复 |
 | `ColorOsPolicy.java` | 模型解析、信号换算、参考固件电流单位及 slot 所有权规则 |
 | `ColorOsBattery.java` | 只读检测 Oplus 串联电芯数量、选择整包电压并归一化功率输入 |
+| `ColorOsCharge.java` | 限频读取原生 PLC 旁路状态，向共享充电规则提供已确认或未知的读数 |
 | `DuoPolicy.java` / `ColorOsRadio.java` | Duo 状态规则、默认数据卡顺序及各状态栏实例共享的限频电话服务采样 |
 | `ColorOsLayout.java` | 主状态栏、锁屏与通知/QS 头部的本地容器关联，隔离各行图标 |
 | `ColorOsReadings.java` | 在 ColorOS 原生布局中挂载环外读数组，复用共享绘制与排版函数 |

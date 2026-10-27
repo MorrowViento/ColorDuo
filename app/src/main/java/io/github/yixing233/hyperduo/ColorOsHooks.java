@@ -88,17 +88,24 @@ final class ColorOsHooks {
     static boolean isInstalled() { return installed; }
 
     private static final ColorOsBattery BATTERY_SAMPLER = new ColorOsBattery();
+    private static final ColorOsCharge CHARGE_SAMPLER = new ColorOsCharge();
     private static final ColorOsRadio RADIO_SAMPLER = new ColorOsRadio();
     private static volatile DuoPolicy.Charge observedCharge = DuoPolicy.Charge.UNKNOWN;
+    private static String lastChargeNote;
 
     static boolean batteryStatus(int status, int plugged) {
-        DuoPolicy.Charge next = DuoPolicy.charge(status, plugged);
+        ColorOsCharge.Sample sample = CHARGE_SAMPLER.sample(status, plugged, SystemClock.elapsedRealtime());
+        DuoPolicy.Charge next = sample.charge;
+        String note = "ColorOS charging: state=" + next + " status=" + status + " plugged=" + plugged
+                + " plc=" + (sample.bypass == null ? "unavailable" : sample.bypass ? "enabled(3)" : "disabled(2)");
         if (next != observedCharge) {
             observedCharge = next;
-            TrioHooks.log(TrioHooks.LOG_INFO, "ColorOS charging: state=" + next
-                    + " status=" + status + " plugged=" + plugged);
+            TrioHooks.log(TrioHooks.LOG_INFO, note);
             invalidateHosts();
+        } else if (TrioConfig.debugLog() && !note.equals(lastChargeNote)) {
+            TrioHooks.log(TrioHooks.LOG_INFO, note);
         }
+        lastChargeNote = note;
         return next == DuoPolicy.Charge.CHARGING;
     }
 

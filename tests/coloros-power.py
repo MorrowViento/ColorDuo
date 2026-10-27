@@ -220,5 +220,8 @@ with tempfile.TemporaryDirectory(prefix="colorduo-power-") as directory:
     subprocess.run(compiler + ["-encoding", "UTF-8", "-d", directory,
                               str(SOURCE / "Refl.java"), str(SOURCE / "ColorOsPolicy.java"),
                               str(SOURCE / "ColorOsBattery.java"),
+                              str(SOURCE / "ColorOsCharge.java"), str(SOURCE / "DuoPolicy.java"),
+                              str(ROOT / "tests/ColorOsChargeTest.java"),
                               str(test_source)], check=True)
     subprocess.run(["java", "-cp", directory, "io.github.yixing233.hyperduo.ColorOsPowerTest"], check=True)
+    subprocess.run(["java", "-cp", directory, "io.github.yixing233.hyperduo.ColorOsChargeTest"], check=True)
