@@ -313,7 +313,7 @@ final class TrioGeometry {
     static final float[] ZONE_CY = { 19f, 64f, 104f };
 
     /** Text needs a wider opening than four signal beads, including a three-digit value. */
-    static final float TEXT_GAP_WIDTH_DEG = 120f;
+    static final float TEXT_GAP_WIDTH_DEG = 128f;
 
     static float ringOpeningDegrees(int part) {
         return part == Prefs.PART_VALUE || part == Prefs.PART_TYPE || part == Prefs.PART_CLOCK

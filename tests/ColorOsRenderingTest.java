@@ -203,13 +203,15 @@ public final class ColorOsRenderingTest {
             settings.ringZones[zone] = new int[]{Prefs.PART_VALUE};
             TrioAppearance appearance = TrioAppearance.of(settings);
             check(TrioRenderer.maxValueSize(appearance) >= settings.valueSize,
-                    "default fits the advertised range in both end slots");
+                    "default fits both end slots: zone=" + zone + " stroke=" + stroke
+                            + " max=" + TrioRenderer.maxValueSize(appearance));
             for (int level : new int[]{8, 88, 100}) {
                 state.level = level;
                 try (Frame frame = new Frame()) {
                     TrioRenderer.drawState(frame, 480, 400, state, settings);
                     check(Math.abs(frame.textSize - settings.valueSize) < 0.01f,
-                            "default 36 is actually drawn at 36: zone=" + zone + " level=" + level);
+                            "default 36 is actually drawn at 36: zone=" + zone + " level=" + level
+                                    + " stroke=" + stroke + " actual=" + frame.textSize);
                 }
             }
             state.level = 88;
@@ -223,13 +225,13 @@ public final class ColorOsRenderingTest {
         settings.ringZones = Prefs.decodeLayout("3|6|7|");
         settings.showSim1 = true;
         TrioAppearance.Ring topText = TrioAppearance.of(settings).ring(88, false, -1, "5G", 2, false);
-        check(Math.abs((topText.gapEnd() - topText.gapStart()) * topText.sweep() - 120f) < 0.01f,
+        check(Math.abs((topText.gapEnd() - topText.gapStart()) * topText.sweep() - 128f) < 0.01f,
                 "text widens the top opening to clear the digits");
         check(Math.abs(360f - topText.sweep() - 96f) < 0.01f,
                 "signal beads keep their original opening and spacing");
         settings.ringZones = Prefs.decodeLayout("7|6|3|");
         TrioAppearance.Ring bottomText = TrioAppearance.of(settings).ring(88, false, -1, "5G", 2, false);
-        check(Math.abs(360f - bottomText.sweep() - 120f) < 0.01f,
+        check(Math.abs(360f - bottomText.sweep() - 128f) < 0.01f,
                 "bottom text has the same opening width as top text");
         check(TrioGeometry.zoneTextRoomH(1, bottomText.parts)
                         <= 2f * (TrioGeometry.ZONE_CUT_BOTTOM - TrioGeometry.ZONE_CY[1] - 2.5f),
