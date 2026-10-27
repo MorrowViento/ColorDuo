@@ -15,6 +15,7 @@ DUO_FILES = {
     "TrioAppearance.java",        # Retain physical SIM identity in capsule bands.
     "TrioPreviewView.java",       # Preview the same paused rendering path.
     "ui/DrawingScreen.kt",        # Charging-paused preview scene.
+    "ui/PartControls.kt",         # Percentage range follows the actual rendered slot.
     "OutRingLayout.java",         # Recompute reserve after dropping optional readings.
 }
 EXPOSED_HELPERS = (

@@ -24,7 +24,7 @@ import android.view.View;
  * Draws the "trio" glyph (battery ring + Wi-Fi arcs + signal dots + level indicator)
  * into a host view's canvas, in the 120x120 design space of {@link TrioGeometry}.
  */
-final class TrioRenderer {
+public final class TrioRenderer {
 
     private TrioRenderer() {
     }
@@ -252,6 +252,52 @@ final class TrioRenderer {
     }
 
     // ------------------------------------------------------------------ public
+
+    /** Resolve clock ownership from the same live layout that this renderer paints. */
+    static boolean drawsClock(TrioState state, TrioAppearance appearance) {
+        if (state == null || !appearance.glyph || TrioState.sClockText == null
+                || TrioState.sClockText.isEmpty()) return false;
+        boolean charging = state.charging || state.chargingPaused;
+        int wifi = state.wifiPresent ? state.wifiLevel : -1;
+        String type = state.mobileService == DuoPolicy.Radio.REGISTERING ? "" : state.mobileType;
+        int[] parts;
+        int count;
+        if (appearance.capsule) {
+            parts = appearance.capsule(state.level, charging, wifi, type, state.sims, state.wifiPresent).parts;
+            count = parts.length;
+        } else if (appearance.ring) {
+            parts = appearance.ring(state.level, charging, wifi, type, state.sims, state.wifiPresent).parts;
+            count = 3;
+        } else {
+            return false;
+        }
+        for (int z = 0; z < count; z++) if (parts[z] == Prefs.PART_CLOCK) return true;
+        return false;
+    }
+
+    /** The percentage slider must stop where its assigned ring slots stop growing. */
+    public static int maxValueSize(TrioAppearance appearance) {
+        if (!appearance.ring) return appearance.capsule
+                ? Prefs.MAX_CAPSULE_VALUE_SIZE : Prefs.MAX_VALUE_SIZE;
+        setFont(appearance.fontPath);
+        applyWeight(appearance.valueWeight);
+        int maximum = 0;
+        for (int z = 0; z < 3; z++) {
+            boolean placed = false;
+            for (int part : appearance.ringZones[z]) if (part == Prefs.PART_VALUE) placed = true;
+            if (!placed) continue;
+            if (z == 1) return Prefs.MAX_RING_VALUE_SIZE;
+            maximum = Math.max(maximum, Prefs.MIN_VALUE_SIZE);
+            for (int size = Prefs.MAX_RING_VALUE_SIZE; size >= Prefs.MIN_VALUE_SIZE; size--) {
+                if (ringTextSize("100", size, z, appearance.ringStroke, 100) >= size - 0.01f
+                        && ringTextSize("88", size, z, appearance.ringStroke, 100) >= size - 0.01f) {
+                    maximum = Math.max(maximum, size);
+                    break;
+                }
+            }
+        }
+        return maximum == 0 ? Prefs.MAX_RING_VALUE_SIZE : maximum;
+    }
 
     static void draw(Canvas canvas, View host, TrioState s) {
         draw(canvas, host, s, TrioConfig.get());
@@ -536,30 +582,8 @@ final class TrioRenderer {
                     // units of actual ink - so dividing by them capped every line at
                     // about 58% of the room it really had, and the bottom third came
                     // out around a third of the size asked for.
-                    final float room = TrioGeometry.zoneTextRoomH(z);
                     final int suffixScale = part == Prefs.PART_TYPE ? a.typeSuffixScale : 100;
-                    // The height cap is a straight ratio at the requested size.
-                    final float inkAtRequested = Math.max(1f, textInkHeight(text, requested));
-                    final float maxByHeight = requested * room / inkAtRequested;
-                    // The width cap is NOT independent of the answer: the budget is the
-                    // narrowest chord the line spans, which depends on how tall the line
-                    // ends up - and that depends on the size being solved for. Iterate
-                    // to a fixed point instead of guessing once. (The first attempt at
-                    // this multiplied the ink height by fitted/requested as well, which
-                    // scaled it twice and never converged.)
-                    float fitted = maxByHeight;
-                    for (int pass = 0; pass < 4; pass++) {
-                        final float inkH = Math.max(1f, textInkHeight(text, fitted));
-                        final float maxByWidth = fitSize(text, requested,
-                                TrioGeometry.zoneTextRoomW(z, a.ringStroke, inkH), suffixScale);
-                        final float next = Math.min(maxByHeight, maxByWidth);
-                        if (Math.abs(next - fitted) < 0.05f) {
-                            fitted = next;
-                            break;
-                        }
-                        fitted = next;
-                    }
-                    final float inkH = Math.max(1f, textInkHeight(text, requested));
+                    final float fitted = ringTextSize(text, requested, z, a.ringStroke, suffixScale);
                     // Centred in the band, and on its INK rather than its metrics: the
                     // metrics reserve leading above the capitals that a digits-only
                     // string never draws, so a metrics-centred line sits high enough to
@@ -582,6 +606,20 @@ final class TrioRenderer {
             }
             c.restoreToCount(save);
         }
+    }
+
+    private static float ringTextSize(String text, float requested, int zone, int stroke, int suffixScale) {
+        final float ink = Math.max(1f, textInkHeight(text, requested));
+        final float heightLimit = requested * TrioGeometry.zoneTextRoomH(zone) / ink;
+        float fitted = heightLimit;
+        for (int pass = 0; pass < 4; pass++) {
+            float inkH = Math.max(1f, textInkHeight(text, fitted));
+            float next = Math.min(heightLimit, fitSize(text, requested,
+                    TrioGeometry.zoneTextRoomW(zone, stroke, inkH), suffixScale));
+            if (Math.abs(next - fitted) < 0.05f) return next;
+            fitted = next;
+        }
+        return fitted;
     }
 
     /**
@@ -751,7 +789,8 @@ final class TrioRenderer {
 
         if (level > 0) {
             STROKE.setColor(role);
-            drawCapsuleFill(canvas, stroke, Math.min(1f, level / 100f), topReach, bottomReach);
+            if (level >= 100) canvas.drawPath(CAPSULE, STROKE);
+            else drawCapsuleFill(canvas, stroke, level / 100f, topReach, bottomReach);
         }
 
         if (cap.dots && !radioMuted) {
@@ -1087,10 +1126,13 @@ final class TrioRenderer {
 
         // Four straight runs and two half-circle caps, in travel order. The gaps
         // are not segments: they carry no ink in either pass.
-        final float topLeft = (cx - topReach) - (left + r);
-        final float bottomLeft = (cx - bottomReach) - (left + r);
-        final float bottomRight = (right - r) - (cx + bottomReach);
-        final float topRight = (right - r) - (cx + topReach);
+        // A short capsule can place a gap edge beyond the cap's tangent. The
+        // outline still traverses that line, in the opposite direction; its
+        // length must remain positive in both the budget and the fill walk.
+        final float topLeft = Math.abs((cx - topReach) - (left + r));
+        final float bottomLeft = Math.abs((cx - bottomReach) - (left + r));
+        final float bottomRight = Math.abs((right - r) - (cx + bottomReach));
+        final float topRight = Math.abs((right - r) - (cx + topReach));
         final float capLen = (float) Math.PI * r;
         final float total = topLeft + capLen + bottomLeft + bottomRight + capLen + topRight;
         if (total <= 0f) {

@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import io.github.yixing233.hyperduo.Prefs
 import io.github.yixing233.hyperduo.R
 import io.github.yixing233.hyperduo.TrioAppearance
+import io.github.yixing233.hyperduo.TrioRenderer
 import io.github.yixing233.hyperduo.TrioSettings
 import io.github.yixing233.hyperduo.TrioZones
 import top.yukonga.miuix.kmp.basic.Text
@@ -350,17 +351,7 @@ internal fun geometrySliders(): List<SliderSpec> {
             part = value,
             min = Prefs.MIN_VALUE_SIZE,
             max = Prefs.MAX_VALUE_SIZE,
-            // Each arrangement gets the ceiling it can actually draw to, and nothing more:
-            // a slider that runs past what the glyph can hold is a slider that does nothing
-            // at the top. The ring sizes a piece by the third it sits in; the capsule divides
-            // its interior by what its two cells draw; the rectangle has a fixed slot.
-            maxFor = {
-                when {
-                    it.ring -> Prefs.MAX_RING_VALUE_SIZE
-                    it.capsule -> Prefs.MAX_CAPSULE_VALUE_SIZE
-                    else -> Prefs.MAX_VALUE_SIZE
-                }
-            },
+            maxFor = { TrioRenderer.maxValueSize(it) },
             read = { it.valueSize },
             write = { r, v -> r.setValueSize(v) },
             titleRes = { R.string.value_size_title },
@@ -822,10 +813,11 @@ private fun SliderRow(
     update: ((SettingsRepository) -> Unit) -> Unit,
 ) {
     val a = TrioAppearance.of(settings)
+    val maximum = spec.maxFor(a)
     IntSlider(
-        value = spec.read(settings).coerceAtMost(spec.maxFor(a)),
+        value = spec.read(settings).coerceAtMost(maximum),
         min = spec.min,
-        max = spec.maxFor(a),
+        max = maximum,
         step = spec.step,
         title = stringResource(spec.titleRes(a)),
         summary = stringResource(spec.summaryRes(a)),

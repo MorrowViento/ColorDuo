@@ -72,7 +72,10 @@ public final class ColorOsHostTest {
         void setScaleType(ScaleType value){scale=value;}
     }
     static class Glyph extends Drawable { void invalidateSelf(){} }
-    static class State { int level=65,wifiLevel=3;boolean wifiPresent=true; }
+    static class State { int level=65,wifiLevel=3;boolean wifiPresent=true,clock; }
+    static class TrioRenderer {
+        static boolean drawsClock(State state,TrioAppearance appearance){return state.clock;}
+    }
     static class Config { boolean enabled=true; }
     static class TrioConfig {
         static Config config=new Config();
@@ -123,7 +126,7 @@ public final class ColorOsHostTest {
         final Map<View,Integer> nativeVisibility=new IdentityHashMap<>();
         final Map<View,Integer> visibilityOverrides=new IdentityHashMap<>();
         ColorOsReadings extra;
-        View clockContainer;
+        View clockContainer=new View();
         int nativeDepth,ownedWidth,ownedHeight;
         boolean active,failed,logged;
         final boolean main;
@@ -133,13 +136,14 @@ public final class ColorOsHostTest {
             parent.addView(meter,0,new LinearLayout.LayoutParams(-2,-1));
             meter.addView(image,0,new LinearLayout.LayoutParams(18,16));
             nativeVisibility.put(image,View.VISIBLE);
+            nativeVisibility.put(clockContainer,View.VISIBLE);
         }
         // Retained in the fixture so re-introducing the old main-only predicate fails QS/keyguard tests.
         boolean primaryBar(){return main;}
         void capture(){}
         void readState(){}
         void hide(String name,boolean hidden){}
-        void hide(View view,boolean hidden){}
+        void hide(View view,boolean hidden){if(view!=null)view.setVisibility(hidden?View.GONE:nativeVisibility.get(view));}
         void syncSlots(TrioAppearance appearance){}
         void restore(){restoreBatteryInternal();}
 
@@ -160,6 +164,14 @@ public final class ColorOsHostTest {
         check(keyguard.extra.parent==keyguard.meter.parent,"keyguard owns its own strip");
         check(notification.extra.parent==notification.meter,"notification ConstraintLayout reserves inside its meter");
         check(controls.extra.parent==controls.meter,"control-panel ConstraintLayout reserves inside its meter");
+        main.state.clock=true;
+        main.applyInternal();
+        check(main.clockContainer.visibility==View.GONE,"a frame that draws time hides the native clock");
+        main.state.clock=false;
+        main.applyInternal();
+        check(main.clockContainer.visibility==View.VISIBLE,"a fallback change hands time back immediately");
+        main.state.clock=true;
+        main.applyInternal();
         keyguard.state.level=-1;
         keyguard.applyInternal();
         check(!keyguard.active&&keyguard.image.drawable==keyguard.nativeDrawable,"unknown battery restores only that host");
@@ -177,6 +189,7 @@ public final class ColorOsHostTest {
             host.applyInternal();
             check(!host.active&&host.image.drawable==host.nativeDrawable,"master off restores every context");
             check(host.extra.visibility==View.GONE,"master off removes each readout strip");
+            check(host.clockContainer.visibility==View.VISIBLE,"master off restores each original clock state");
         }
         System.out.println("ColorOS production host activation, header mounting and per-instance restoration passed");
     }

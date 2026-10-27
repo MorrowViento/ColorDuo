@@ -631,8 +631,7 @@ final class ColorOsHooks {
             hide("battery_content", true);
             hide("battery_percentage_view", !appearance.handsBackPercentage());
             hide("battery_charge_icon", appearance.hidesNativeBolt());
-            hide(clockContainer, appearance.hidesStatusClock()
-                    && TrioState.sClockText != null && !TrioState.sClockText.isEmpty());
+            hide(clockContainer, TrioRenderer.drawsClock(state, appearance));
             syncExtra(appearance);
             syncSlots(appearance);
             glyph.invalidateSelf();
