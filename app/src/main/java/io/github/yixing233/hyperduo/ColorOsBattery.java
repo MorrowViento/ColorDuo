@@ -10,6 +10,7 @@ import java.nio.file.Paths;
 /** Read-only Oplus battery topology and pack-voltage input normalization. */
 final class ColorOsBattery {
     static final String CELLS_PATH = "/sys/class/oplus_chg/battery/aging_ffc_data";
+    static final String BATTERY_VOLTAGE_PATH = "/sys/class/power_supply/battery/voltage_now";
     static final String PACK_VOLTAGE_PATH = "/sys/class/power_supply/bms/voltage_now";
     static final long RETRY_MILLIS = 60_000L;
 
@@ -37,6 +38,7 @@ final class ColorOsBattery {
     private int detectedCells;
     private long cellsProbeAt = Long.MIN_VALUE;
     private long packFailureAt = Long.MIN_VALUE;
+    private long voltageFailureAt = Long.MIN_VALUE;
 
     ColorOsBattery() {
         this(ColorOsBattery::readBounded);
@@ -55,22 +57,50 @@ final class ColorOsBattery {
         }
         int cells = ColorOsPolicy.batterySeriesCells(fingerprint, detectedCells);
         String cellsSource = detectedCells != 0 ? "aging_ffc_data" : cells != 0 ? "firmware" : "unknown";
+        int inputVoltage = rawVoltage;
+        String voltageSource = "broadcast";
+        if (ColorOsPolicy.batteryVoltageNodeReportsMillivolts(fingerprint) && !validMilliVolts(rawVoltage)) {
+            // The broadcast has already lost its fractional volts; scaling 4 to 4000
+            // cannot recover the measured 4474 mV. Read the verified mV node instead.
+            inputVoltage = 0;
+            voltageSource = "unavailable";
+            if (retryDue(voltageFailureAt, elapsedMillis)) {
+                inputVoltage = batteryMilliVolts(read(BATTERY_VOLTAGE_PATH));
+                if (inputVoltage == 0) voltageFailureAt = elapsedMillis;
+                else voltageSource = "battery_node_mV";
+            }
+        }
         int measuredPack = 0;
-        if (cells == 2 && rawVoltage > 0 && rawVoltage <= 5000
+        if (cells == 2 && inputVoltage > 0 && inputVoltage <= 5000
                 && retryDue(packFailureAt, elapsedMillis)) {
             measuredPack = packMilliVolts(read(PACK_VOLTAGE_PATH));
             if (measuredPack == 0) packFailureAt = elapsedMillis;
         }
-        int voltage = ColorOsPolicy.batteryPackVoltageMilliVolts(rawVoltage, cells, measuredPack);
-        String voltageSource = cells == 2 && rawVoltage > 0 && rawVoltage <= 5000
-                ? measuredPack > 0 ? "bms_pack" : "single_cell_x2"
-                : cells == 2 && rawVoltage > 5000 ? "broadcast_pack" : "broadcast";
+        int voltage = ColorOsPolicy.batteryPackVoltageMilliVolts(inputVoltage, cells, measuredPack);
+        if (cells == 2 && inputVoltage > 0 && inputVoltage <= 5000) {
+            voltageSource = measuredPack > 0 ? "bms_pack"
+                    : voltageSource.equals("broadcast") ? "single_cell_x2" : voltageSource + "_x2";
+        } else if (cells == 2 && inputVoltage > 5000) {
+            voltageSource += "_pack";
+        }
         return new Sample(ColorOsPolicy.batteryCurrentMicroAmps(fingerprint, rawCurrent),
                 voltage, cells, cellsSource, voltageSource);
     }
 
     private static boolean retryDue(long previous, long now) {
         return previous == Long.MIN_VALUE || now - previous >= RETRY_MILLIS;
+    }
+
+    private static boolean validMilliVolts(int value) { return value >= 2000 && value <= 10000; }
+
+    private static int batteryMilliVolts(String value) {
+        if (value == null) return 0;
+        try {
+            int milliVolts = Integer.parseInt(value.trim());
+            return validMilliVolts(milliVolts) ? milliVolts : 0;
+        } catch (NumberFormatException malformed) {
+            return 0;
+        }
     }
 
     private String read(String path) {

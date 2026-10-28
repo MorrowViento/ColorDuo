@@ -31,16 +31,23 @@ public final class ColorOsPowerTest {
     private static final class Nodes implements ColorOsBattery.Reader {
         String cells;
         String pack;
+        String voltage;
         int cellReads;
         int packReads;
+        int voltageReads;
         boolean denied;
+        boolean voltageDenied;
 
         public String read(String path) throws java.io.IOException {
             if (path.equals(ColorOsBattery.CELLS_PATH)) cellReads++;
             else if (path.equals(ColorOsBattery.PACK_VOLTAGE_PATH)) packReads++;
+            else if (path.equals(ColorOsBattery.BATTERY_VOLTAGE_PATH)) voltageReads++;
             else throw new AssertionError("Unexpected battery path: " + path);
-            if (denied) throw new java.io.IOException("permission denied");
-            return path.equals(ColorOsBattery.CELLS_PATH) ? cells : pack;
+            if (denied || (voltageDenied && path.equals(ColorOsBattery.BATTERY_VOLTAGE_PATH))) {
+                throw new java.io.IOException("permission denied");
+            }
+            return path.equals(ColorOsBattery.CELLS_PATH) ? cells
+                    : path.equals(ColorOsBattery.PACK_VOLTAGE_PATH) ? pack : voltage;
         }
     }
 
@@ -208,6 +215,96 @@ public final class ColorOsPowerTest {
                 "reported total voltage remains authoritative");
         check(ColorOsPolicy.batteryPackVoltageMilliVolts(4465, 0, 8930) == 4465,
                 "a pack node alone cannot establish hardware topology");
+
+        String pmx = "OPPO/PMX110/OP659FL1:17/CP2A.260605.016/C.34208f1-dbc5d7-d921b4:user/release-keys";
+        // Issue #5: Binder fffffade/ffffffff and current_now both report -1314 mA;
+        // battery/voltage_now is 4474 mV, while the broadcast is truncated to 4 mV.
+        check((int) Long.parseLong("fffffade", 16) == -1314, "the issue's signed Binder value is -1314");
+        check(powerText(wattsOf(-1314, 4)).equals("0.0W"), "the exact issue input reproduces zero power");
+        check(powerText(wattsOf(-1314000, 4)).equals("0.0W"), "fixing current alone leaves the voltage bug");
+        check(powerText(wattsOf(-1314, 4474)).equals("0.0W"), "fixing voltage alone leaves the current bug");
+        Nodes pmxNodes = new Nodes();
+        pmxNodes.voltage = "4474\n";
+        ColorOsBattery pmxSampler = new ColorOsBattery(pmxNodes);
+        ColorOsBattery.Sample pmxSample = pmxSampler.sample(pmx, -1314, 4, 0);
+        check(pmxSample.currentMicroAmps == -1314000 && pmxSample.voltageMilliVolts == 4474,
+                "both measured PMX input units must be corrected before the shared formula");
+        check(pmxSample.seriesCells == 0 && pmxSample.cellsSource.equals("unknown"),
+                "a verified mA input does not establish PMX hardware topology");
+        check(pmxSample.voltageSource.equals("battery_node_mV") && pmxNodes.voltageReads == 1,
+                "the lost fractional voltage comes from the actual mV node");
+        check(Math.abs(wattsOf(pmxSample.currentMicroAmps, pmxSample.voltageMilliVolts) - 5.878836f) < 0.00001f,
+                "the measured input represents 5.878836 W before any independently detected series correction");
+        check(powerText(wattsOf(pmxSample.currentMicroAmps, pmxSample.voltageMilliVolts)).equals("5.9W"),
+                "the PMX fix retains the upstream decimal formatter");
+        check(pmxSampler.sample(pmx, 1314, 4, 3000).currentMicroAmps == 1314000,
+                "the new firmware handles either current sign");
+        check(pmxSampler.sample(pmx, 0, 4, 6000).currentMicroAmps == 0, "real zero remains zero on PMX");
+        check(pmxSampler.sample(pmx, Integer.MIN_VALUE, 4, 9000).currentMicroAmps == Integer.MIN_VALUE,
+                "unavailable PMX current preserves its sentinel");
+        check(pmxSampler.sample(pmx, Integer.MAX_VALUE, 4, 12000).currentMicroAmps == Integer.MIN_VALUE,
+                "PMX current overflow must not become a fabricated reading");
+        pmxNodes.voltage = "4410";
+        check(pmxSampler.sample(pmx, -1314, 4, 15000).voltageMilliVolts == 4410,
+                "valid fallback voltage is refreshed rather than cached as a stale reading");
+        int reads = pmxNodes.voltageReads;
+        ColorOsBattery.Sample correctBroadcast = pmxSampler.sample(pmx, -1314, 4474, 18000);
+        check(correctBroadcast.voltageMilliVolts == 4474 && correctBroadcast.voltageSource.equals("broadcast")
+                && pmxNodes.voltageReads == reads, "a valid broadcast needs no sysfs fallback");
+        check(pmxSampler.sample(pmx, -1314, 0, 21000).voltageMilliVolts == 4410,
+                "an absent broadcast can use the verified voltage node");
+
+        Nodes pmxDual = new Nodes();
+        pmxDual.cells = "0,2,0,0,654";
+        pmxDual.voltage = "4474";
+        ColorOsBattery.Sample pmxSeries = new ColorOsBattery(pmxDual).sample(pmx, -1314, 4, 0);
+        check(pmxSeries.seriesCells == 2 && pmxSeries.voltageMilliVolts == 8948
+                && pmxSeries.voltageSource.equals("battery_node_mV_x2"),
+                "independently detected series cells correct the normalized node voltage once");
+        check(Math.abs(wattsOf(pmxSeries.currentMicroAmps, pmxSeries.voltageMilliVolts) - 11.757672f) < 0.00001f
+                && powerText(wattsOf(pmxSeries.currentMicroAmps, pmxSeries.voltageMilliVolts)).equals("11W"),
+                "series correction retains the upstream whole-watt format above 10 W");
+        pmxDual.pack = "8920000";
+        ColorOsBattery.Sample pmxMeasured = new ColorOsBattery(pmxDual).sample(pmx, -1314, 4, 0);
+        check(pmxMeasured.voltageMilliVolts == 8920 && pmxMeasured.voltageSource.equals("bms_pack"),
+                "a measured pack voltage still takes precedence after node normalization");
+        pmxDual.voltage = "8948";
+        ColorOsBattery.Sample pmxPack = new ColorOsBattery(pmxDual).sample(pmx, -1314, 4, 0);
+        check(pmxPack.voltageMilliVolts == 8948 && pmxPack.voltageSource.equals("battery_node_mV_pack"),
+                "a node already reporting pack voltage is never doubled");
+
+        pmxNodes.voltageDenied = true;
+        ColorOsBattery.Sample lost = pmxSampler.sample(pmx, -1314, 4, 24000);
+        check(lost.voltageMilliVolts == 0 && lost.voltageSource.equals("unavailable")
+                && Float.isNaN(wattsOf(lost.currentMicroAmps, lost.voltageMilliVolts)),
+                "permission failure drops the stale voltage and does not pretend that 4 mV is usable");
+        reads = pmxNodes.voltageReads;
+        pmxNodes.voltageDenied = false;
+        check(pmxSampler.sample(pmx, -1314, 4, 27000).voltageMilliVolts == 0
+                && pmxNodes.voltageReads == reads, "failed voltage reads respect the retry cooldown");
+        check(pmxSampler.sample(pmx, -1314, 4474, 30000).voltageMilliVolts == 4474,
+                "a valid broadcast recovers immediately during sysfs cooldown");
+        check(pmxSampler.sample(pmx, -1314, 4, 84000).voltageMilliVolts == 4410
+                && pmxNodes.voltageReads == reads + 1, "the voltage node can recover after a minute");
+
+        for (String invalid : new String[] {"", "4", "1999", "10001", "4474000", "-4474", "nope",
+                "4474\n4475", "2147483648"}) {
+            Nodes invalidVoltage = new Nodes();
+            invalidVoltage.voltage = invalid;
+            ColorOsBattery.Sample invalidSample = new ColorOsBattery(invalidVoltage).sample(pmx, -1314, 4, 0);
+            check(invalidSample.voltageMilliVolts == 0, "invalid mV node is not guessed or rescaled: " + invalid);
+        }
+        Nodes scoped = new Nodes();
+        scoped.voltage = "4474";
+        String futurePmx = pmx.replace("C.34208f1", "C.new");
+        ColorOsBattery.Sample future = new ColorOsBattery(scoped).sample(futurePmx, -1314000, 4474, 0);
+        check(future.currentMicroAmps == -1314000 && future.voltageMilliVolts == 4474
+                && scoped.voltageReads == 0, "unverified PMX firmware retains Android units");
+        ColorOsBattery.Sample otherBroken = new ColorOsBattery(scoped).sample("other firmware", -1314000, 4, 0);
+        check(otherBroken.voltageMilliVolts == 4 && scoped.voltageReads == 0,
+                "the measured mV-node exception does not become a general voltage heuristic");
+        check(nodes.voltageReads == 0 && actual.voltageReads == 0,
+                "the existing OnePlus firmware never reads the PMX-specific voltage fallback");
         System.out.println("ColorOS current units, series-cell detection, pack-voltage selection and upstream rendering passed");
     }
 }

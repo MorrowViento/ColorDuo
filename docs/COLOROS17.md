@@ -48,6 +48,14 @@ alpha5 接管 `StatBatteryMeterView` 的各个实例，包括主状态栏、锁�
 
 `python3 tests/upstream-parity.py` 继续对比固定上游的 19 个未演进文件；8 个明确演进的状态、渲染、布局和设置文件由针对性的行为回归覆盖。应用标识与平台采样桥接仍单独归一化；默认值、配置迁移和功率公式保持原有保护。CI 使用完整提交历史。
 
+## 0.2.5：PMX110 功率输入
+
+[#5 的设备数据](https://github.com/chorusfruit-233/ColorDuo/issues/5#issuecomment-6462077076) 来自 `OPPO/PMX110/OP659FL1:17/CP2A.260605.016/C.34208f1-dbc5d7-d921b4:user/release-keys`。Binder 电流的 `fffffffffffffade` 和 `current_now` 均为 -1314，按 mA 上报；`battery/voltage_now` 为 4474 mV，标准电池广播却只有 4 mV。两项错误叠加使旧版显示接近 0W，只修电流仍不能恢复正常读数。
+
+该完整指纹新增 mA 归一化；广播电压不在有效毫伏范围时，只读上述已验证的 mV 节点，不把截断后的整数伏特直接放大。正常广播仍优先使用，节点失效时清除旧值并限频重试，功率保持未知。原有电芯检测继续独立工作，不根据电流单位推断 PMX110 的串联数量，也不把异常规则扩展到未验证固件。
+
+离线回归执行原始数据、生产功率公式和格式化，并覆盖有效广播、节点失效与恢复及电芯折算组合；SystemUI 对该节点的实际读取权限和修复后的显示仍需报告者安装确认。
+
 ## 0.2.4：原生旁路供电
 
 参考一加 13 的实测样本中，开启和关闭原生游戏助手旁路供电时，Android 电池 `status` 均为 2；独立的 `/sys/class/oplus_chg/common/plc` 分别为 `status=3` 和 `status=2`。旧版只看前者，因此不会进入灰色状态。

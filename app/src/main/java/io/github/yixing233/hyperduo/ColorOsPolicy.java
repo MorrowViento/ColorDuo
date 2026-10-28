@@ -11,11 +11,18 @@ final class ColorOsPolicy {
 
     // Verified with BatteryPropertiesRegistrar.getProperty(CURRENT_NOW), the OPLUS
     // BatteryService dump and the current_now node. Other builds keep the Android uA contract.
-    private static final String MILLIAMP_FIRMWARE =
+    private static final String ONEPLUS_FIRMWARE =
             "OnePlus/PJZ110/OP5D0DL1:17/CP2A.260605.016/V.487427a-2227f32-224bc4c:user/release-keys";
+    private static final String OPPO_PMX_FIRMWARE =
+            "OPPO/PMX110/OP659FL1:17/CP2A.260605.016/C.34208f1-dbc5d7-d921b4:user/release-keys";
 
     static boolean batteryReportsMilliamps(String fingerprint) {
-        return MILLIAMP_FIRMWARE.equals(fingerprint);
+        return ONEPLUS_FIRMWARE.equals(fingerprint) || OPPO_PMX_FIRMWARE.equals(fingerprint);
+    }
+
+    // Issue #5: this firmware exposes 4474 mV in sysfs but broadcasts only 4 mV.
+    static boolean batteryVoltageNodeReportsMillivolts(String fingerprint) {
+        return OPPO_PMX_FIRMWARE.equals(fingerprint);
     }
 
     static int batteryCurrentMicroAmps(String fingerprint, int reported) {
@@ -45,10 +52,10 @@ final class ColorOsPolicy {
         }
     }
 
-    /** Both the measured firmware and its OnePlus 13 gauge use a two-cell series pack. */
+    /** Only the reference OnePlus 13 firmware has a verified two-cell hardware fallback. */
     static int batterySeriesCells(String fingerprint, int detected) {
         if (detected == 1 || detected == 2) return detected;
-        return MILLIAMP_FIRMWARE.equals(fingerprint) ? 2 : 0;
+        return ONEPLUS_FIRMWARE.equals(fingerprint) ? 2 : 0;
     }
 
     /** Do not multiply a pack voltage, a parallel pack or an unknown topology. */
