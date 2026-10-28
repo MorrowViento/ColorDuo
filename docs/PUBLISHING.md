@@ -38,19 +38,19 @@ Prepare release 只创建源码仓库的 Release 草稿，并附 APK 和校验�
 
 ## 模块仓条件核对
 
-规则核对基线：2026-10-24；发布记录更新：2026-10-27。规则来自 [submission README](https://github.com/Xposed-Modules-Repo/submission/blob/1034cef40f882cfe5321437b65c47631fc363ef5/README.md)、[用户名校验实现](https://github.com/Xposed-Modules-Repo/submission/blob/1034cef40f882cfe5321437b65c47631fc363ef5/src/bot.ts) 和 [现代 Xposed APK 校验实现](https://github.com/Xposed-Modules-Repo/modules/blob/ab45ed4ea7516ef3414f3a47cafeac72680f86de/src/index.ts)。
+规则核对基线：2026-10-24；发布记录更新：2026-10-28。规则来自 [submission README](https://github.com/Xposed-Modules-Repo/submission/blob/1034cef40f882cfe5321437b65c47631fc363ef5/README.md)、[用户名校验实现](https://github.com/Xposed-Modules-Repo/submission/blob/1034cef40f882cfe5321437b65c47631fc363ef5/src/bot.ts) 和 [现代 Xposed APK 校验实现](https://github.com/Xposed-Modules-Repo/modules/blob/ab45ed4ea7516ef3414f3a47cafeac72680f86de/src/index.ts)。
 
 | 项目 | 当前情况 |
 | --- | --- |
 | 申请者与包名 | **匹配**：`chorusfruit-233` 经机器人规范化后是 `chorusfruit_233`；alpha6 起应用 ID 为 `io.github.chorusfruit_233.colorduo` |
 | Xposed APK 结构 | 具有 `META-INF/xposed/module.prop`、`java_init.list`、`scope.list`，API 102；模块仓支持这种现代格式 |
 | 模块介绍与摘要 | 已上传模块仓的 `README.md`、`SUMMARY`、`SOURCE_URL`；介绍中的链接使用源码仓库绝对地址 |
-| 可公开下载的版本 | [源码仓库](https://github.com/chorusfruit-233/ColorDuo/releases/tag/v0.2.4) 与 [模块仓库](https://github.com/Xposed-Modules-Repo/io.github.chorusfruit_233.colorduo/releases/tag/10013-0.2.4) 均已公开 `0.2.4` / `10013`，均为 Latest 正式版，实际下载核验 APK 完全相同 |
-| 发布签名 | 四项 secrets 已由 [发布构建](https://github.com/chorusfruit-233/ColorDuo/actions/runs/40549189563) 验证，实际 APK 签名检查通过，与 `0.2.3` 等此前版本的发布签名一致。私有签名是本项目发布流程的要求，submission 机器人并未规定这一条件 |
+| 可公开下载的版本 | [源码仓库](https://github.com/chorusfruit-233/ColorDuo/releases/tag/v0.2.5) 与 [模块仓库](https://github.com/Xposed-Modules-Repo/io.github.chorusfruit_233.colorduo/releases/tag/10014-0.2.5) 均已公开 `0.2.5` / `10014`，均为 Latest 正式版，实际下载核验 APK 完全相同 |
+| 发布签名 | 四项 secrets 已由 [发布构建](https://github.com/chorusfruit-233/ColorDuo/actions/runs/40646624426) 验证，实际 APK 签名检查通过，与 `0.2.4` 等此前版本的发布签名一致。私有签名是本项目发布流程的要求，submission 机器人并未规定这一条件 |
 | 模块仓申请与邀请 | [申请 #2285](https://github.com/Xposed-Modules-Repo/submission/issues/2285) 已自动批准，[模块仓](https://github.com/Xposed-Modules-Repo/io.github.chorusfruit_233.colorduo) 已建立，维护邀请已接受 |
 | 仓库显示资料 | 已通过网页设置 Description=`ColorDuo`、Website=`https://github.com/chorusfruit-233/ColorDuo/issues`，API 回读确认；[机器人要求通过网页设置](https://github.com/Xposed-Modules-Repo/submission/issues/2285#issuecomment-6383982871) |
 
-**`0.2.4` 双仓正式发布已完成，[发布流程](https://github.com/chorusfruit-233/ColorDuo/actions/runs/40597702143) 与 [官方版本校验](https://github.com/Xposed-Modules-Repo/modules/actions/runs/40597763046) 均已通过。** 从 alpha6 起使用相同发布签名的版本可覆盖升级并保留配置；更早版本的包名迁移步骤见 [配置说明](CONFIGURATION.md#升级与生效)。两个仓库原 alpha6 的预发布标记已取消。
+**`0.2.5` 双仓正式发布已完成，[发布流程](https://github.com/chorusfruit-233/ColorDuo/actions/runs/40647162693) 与 [官方版本校验](https://github.com/Xposed-Modules-Repo/modules/actions/runs/40647233226) 均已通过。** 从 alpha6 起使用相同发布签名的版本可覆盖升级并保留配置；更早版本的包名迁移步骤见 [配置说明](CONFIGURATION.md#升级与生效)。两个仓库原 alpha6 的预发布标记已取消。
 
 ## 申请与上架顺序
 
@@ -58,6 +58,6 @@ Prepare release 只创建源码仓库的 Release 草稿，并附 APK 和校验�
 2. 在 [submission](https://github.com/Xposed-Modules-Repo/submission) 新建 Issue，标题为 `[submission] <最终 applicationId>`，然后接受机器人发出的模块仓维护邀请。
 3. 在浏览器为模块仓设置 Description 为 `ColorDuo`，Homepage 指向源码仓库或 Issues。官方提示维护权限不足以通过 API 修改这些设置。
 4. 只上传模块说明与摘要，不把源码推入模块仓。将 `module-README.md` 作为 `README.md`、`module-SUMMARY` 作为 `SUMMARY`。
-5. 将同一签名 APK 发布到模块仓：Release 标题为版本名、正文为该版更新记录、tag 为 `<versionCode>-<versionName>`，例如 `10013-0.2.4`。首次发布时同时附上有效 APK。
+5. 将同一签名 APK 发布到模块仓：Release 标题为版本名、正文为该版更新记录、tag 为 `<versionCode>-<versionName>`，例如 `10014-0.2.5`。首次发布时同时附上有效 APK。
 
 官方说明完整资料及 Release 更新后通常需要 5～60 分钟显示。最终是否收录以模块仓机器人及维护者处理结果为准。
